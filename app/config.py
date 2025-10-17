@@ -30,9 +30,9 @@ class Config:
     def validate(cls):
         """Check if required settings exist"""
         if not cls.OPENAI_API_KEY:
-            raise ValueError("❌ OPENAI_API_KEY not found! Add it to .env file")
+            raise ValueError(" OPENAI_API_KEY not found! Add it to .env file")
         
-        print(f"✅ Configuration loaded successfully")
+        print(f"   Configuration loaded successfully")
         print(f"   Model: {cls.OPENAI_MODEL}")
         print(f"   Temperature: {cls.OPENAI_TEMPERATURE}")
         return True
@@ -41,12 +41,3 @@ class Config:
 # Validate configuration when this file is imported
 Config.validate()
 
-
-if __name__ == "__main__":
-    # This runs only when you directly run: python config.py
-    print("\n🧪 Testing Configuration...")
-    print(f"API Key: {Config.OPENAI_API_KEY[:10]}...{Config.OPENAI_API_KEY[-4:]}")
-    print(f"Model: {Config.OPENAI_MODEL}")
-    print(f"Temperature: {Config.OPENAI_TEMPERATURE}")
-    print(f"App Name: {Config.APP_NAME}")
-    print(f"Version: {Config.APP_VERSION}")
