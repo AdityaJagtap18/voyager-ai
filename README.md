@@ -93,17 +93,11 @@ voyager-ai/
 - ✅ Research Agent (finds attractions using AI)
 - ✅ User input system
 - ✅ Saves itineraries to JSON files
-
----
-
-## Next Steps (TODO)
-
-- [ ] Itinerary Agent - Organize attractions into daily schedule
-- [ ] Dining Agent - Restaurant recommendations
-- [ ] Accommodation Agent - Hotel suggestions
-- [ ] Multi-agent workflow with LangGraph
-- [ ] Google Maps API integration
-- [ ] FastAPI REST endpoints
+- ✅ Itinerary Agent - Organize attractions into daily schedule
+- ✅ Dining Agent - Restaurant recommendations
+- ✅ Accommodation Agent - Hotel suggestions
+- ✅ Multi-agent workflow with LangGraph
+- ✅ Maps API integration
 
 ---
 
