@@ -1,48 +1,42 @@
 """
-Voyager - AI Travel Planner
-Main entry point
+Voyager - AI Travel Planner (Multi-Agent Version)
+Main entry point with LangGraph multi-agent workflow
 """
+
 import sys
 import os
 import json
-import requests
-import math  # <-- ADDED
+from datetime import datetime
 
-# Add current directory (app) to Python path so local packages import cleanly
+# Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from agents.research_agent import ResearchAgent
+from workflow import create_workflow
 from utils.logger import logger
-from services.ors_api import (
-    geocode,
-    route_distance_duration,
-    matrix_distances,
-    ORSError,
-)
 
 
 def get_user_input():
     """Get trip details from user"""
     print("\n" + "=" * 60)
-    print(" VOYAGER - AI Travel Planner")
+    print("🌍 VOYAGER - AI Travel Planner (Multi-Agent)")
     print("=" * 60 + "\n")
 
     # Get destination
-    destination = input(" Enter destination (e.g., Paris, France): ").strip()
+    destination = input("📍 Enter destination (e.g., Paris, France): ").strip()
 
     # Get number of days
     while True:
         try:
-            days = int(input(" Enter number of days (1-30): "))
+            days = int(input("📅 Enter number of days (1-30): "))
             if 1 <= days <= 30:
                 break
             else:
-                print("     Please enter a number between 1 and 30")
+                print("    ⚠️ Please enter a number between 1 and 30")
         except ValueError:
-            print("     Please enter a valid number")
+            print("    ⚠️ Please enter a valid number")
 
     # Get trip type
-    print("\n Trip Type Options:")
+    print("\n🎯 Trip Type Options:")
     print("   1. Historic")
     print("   2. Adventure")
     print("   3. Relaxation")
@@ -67,256 +61,276 @@ def get_user_input():
             trip_type = trip_types[choice]
             break
         else:
-            print("     Please enter a number between 1 and 7")
+            print("    ⚠️ Please enter a number between 1 and 7")
 
-    return destination, days, trip_type
+    # Get budget
+    print("\n💰 Budget Level:")
+    print("   1. Budget-friendly")
+    print("   2. Medium")
+    print("   3. Luxury")
+
+    budget_map = {"1": "budget", "2": "medium", "3": "luxury"}
+
+    while True:
+        choice = input("\n   Select budget (1-3, or press Enter for Medium): ").strip()
+        if not choice:
+            budget = "medium"
+            break
+        elif choice in budget_map:
+            budget = budget_map[choice]
+            break
+        else:
+            print("    ⚠️ Please enter 1, 2, or 3")
+
+    # Get dietary preferences (optional)
+    print("\n🍴 Dietary Preferences (optional):")
+    print("   Enter any restrictions (comma-separated)")
+    print("   Examples: vegetarian, vegan, gluten-free, halal, kosher")
+    print("   Or press Enter to skip")
+
+    dietary_input = input("\n   Dietary preferences: ").strip()
+    dietary_preferences = [d.strip() for d in dietary_input.split(",")] if dietary_input else []
+
+    return destination, days, trip_type, budget, dietary_preferences
 
 
-def geocode_fallback_nominatim(q: str, limit: int = 1):
+def _normalize_activity(a: dict) -> dict:
     """
-    Free fallback geocoder using OpenStreetMap Nominatim.
-    Keeps your CLI resilient if ORS geocoding rate-limits or is ambiguous.
+    Defensive normalization so display logic never KeyErrors.
+    Accept both 'category' and 'type' keys, provide defaults for everything else.
     """
-    try:
-        resp = requests.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": q, "format": "json", "limit": str(limit)},
-            headers={"User-Agent": "voyager-ai"},
-            timeout=30,
+    return {
+        "time": a.get("time") or "Time TBA",
+        "name": a.get("name") or "Untitled Activity",
+        "category": a.get("category", a.get("type", "Activity")),
+        "duration": a.get("duration") or "Duration TBA",
+        "description": a.get("description") or "",
+        "notes": a.get("notes") or "",
+    }
+
+
+def _normalize_plan(plan: dict) -> dict:
+    """
+    Normalize plan structure enough for robust printing.
+    """
+    plan = plan or {}
+    itinerary_block = plan.get("itinerary") or {}
+
+    # Normalize each day's activities
+    normalized_days = []
+    for day_plan in itinerary_block.get("itinerary") or []:
+        activities = day_plan.get("activities") or []
+        activities = [_normalize_activity(a) for a in activities]
+        total = day_plan.get("total_activities", len(activities))
+        normalized_days.append(
+            {
+                "day": day_plan.get("day", "—"),
+                "theme": day_plan.get("theme", "—"),
+                "total_activities": total,
+                "activities": activities,
+            }
         )
-        resp.raise_for_status()
-        js = resp.json()
-        return [(float(it["lat"]), float(it["lon"])) for it in js][:limit]
-    except Exception:
-        return []
+
+    plan["itinerary"] = {
+        "itinerary": normalized_days,
+        "travel_tips": itinerary_block.get("travel_tips") or [],
+        "packing_suggestions": itinerary_block.get("packing_suggestions") or [],
+    }
+
+    # Normalize other sections to lists
+    plan["restaurants"] = plan.get("restaurants") or []
+    plan["accommodations"] = plan.get("accommodations") or []
+    return plan
 
 
-# ===================== ADDED HELPERS (for day-wise console output) =====================
+def display_results(results: dict):
+    """Display the complete travel plan (robust to missing fields)"""
+    if not results.get("success"):
+        print("\n❌ Planning failed!")
+        print(f"Error: {results.get('error', 'Unknown error')}")
+        return
 
-def _dist_value_km(a):
-    t = a.get("travel") or {}
-    d = t.get("distance_km")
-    try:
-        return float(d)
-    except Exception:
-        return float("inf")
+    plan = _normalize_plan(results.get("plan") or {})
 
-def split_into_days_evenly(attractions, days):
-    """
-    Sort by nearest-first (using travel.distance_km if present),
-    then split evenly across the given number of days.
-    """
-    if not attractions:
-        return [[] for _ in range(days)]
-    ordered = sorted(attractions, key=_dist_value_km)
-    per_day = max(1, math.ceil(len(ordered) / max(1, days)))
-    groups = []
-    for i in range(days):
-        start = i * per_day
-        chunk = ordered[start:start + per_day]
-        if chunk:
-            groups.append(chunk)
-    return groups
+    # Header
+    print("\n" + "=" * 60)
+    print("📋 YOUR COMPLETE TRAVEL PLAN")
+    print("=" * 60)
+    print(f"📍 Destination: {results.get('destination', '—')}")
+    print(f"📅 Duration: {results.get('days', '—')} days")
+    print(f"🎯 Trip Type: {results.get('trip_type', '—')}")
+    print(f"💰 Budget: {results.get('budget', '—')}")
+    print("=" * 60 + "\n")
 
-def _fmt_km(v):
-    try:
-        return f"{float(v):.2f}"
-    except Exception:
-        return None
+    # 1) Day-by-Day Itinerary
+    itinerary = plan.get("itinerary") or {}
+    days_list = itinerary.get("itinerary") or []
+    if days_list:
+        print("📅 DAY-BY-DAY ITINERARY")
+        print("-" * 60)
 
-def _fmt_hours(h):
-    try:
-        h = float(h)
-        return f"{h:.2f} h" if h >= 1 else f"{round(h*60)} min"
-    except Exception:
-        return None
+        for day_plan in days_list:
+            print(f"\n🗓️  Day {day_plan.get('day', '—')}: {day_plan.get('theme', '—')}")
+            print(f"   Activities: {day_plan.get('total_activities', len(day_plan.get('activities') or []))}\n")
 
-# ======================================================================================
+            for activity in (day_plan.get("activities") or []):
+                print(f"   ⏰ {activity.get('time')} - {activity.get('name')}")
+                print(f"      📍 {activity.get('category')} • ⏱️  {activity.get('duration')}")
+                desc = activity.get("description")
+                notes = activity.get("notes")
+                if desc:
+                    print(f"      {desc}")
+                if notes:
+                    print(f"      💡 {notes}")
+                print()
+
+        # Travel tips
+        tips = itinerary.get("travel_tips") or []
+        if tips:
+            print("\n💡 TRAVEL TIPS:")
+            for tip in tips:
+                print(f"   • {tip}")
+
+        # Packing suggestions
+        packing = itinerary.get("packing_suggestions") or []
+        if packing:
+            print("\n🎒 PACKING SUGGESTIONS:")
+            for item in packing:
+                print(f"   • {item}")
+        print()
+
+    # 2) Restaurant Recommendations
+    restaurants = plan.get("restaurants") or []
+    if restaurants:
+        print("\n" + "=" * 60)
+        print("🍽️  RESTAURANT RECOMMENDATIONS")
+        print("-" * 60)
+
+        for i, r in enumerate(restaurants, 1):
+            name = r.get("name", f"Restaurant {i}")
+            cuisine = r.get("cuisine", "—")
+            price = r.get("price_range", "—")
+            meal = r.get("meal_type", "—")
+            loc = r.get("location", "—")
+            must = r.get("must_try", "—")
+            cost = r.get("avg_cost", "—")
+            res = r.get("reservation", "—")
+            desc = r.get("description", "")
+            print(f"\n{i}. {name}")
+            print(f"   🍴 {cuisine} • {price} • {meal}")
+            print(f"   📍 {loc}")
+            print(f"   ⭐ Must Try: {must}")
+            print(f"   💰 {cost}")
+            print(f"   🎫 Reservation: {res}")
+            if desc:
+                print(f"   ✨ {desc}")
+        print()
+
+    # 3) Accommodation Options
+    hotels = plan.get("accommodations") or []
+    if hotels:
+        print("\n" + "=" * 60)
+        print("🏨 ACCOMMODATION OPTIONS")
+        print("-" * 60)
+
+        for i, h in enumerate(hotels, 1):
+            name = h.get("name", f"Stay {i}")
+            typ = h.get("type", "Hotel")
+            vibe = h.get("vibe", "—")
+            loc = h.get("location", "—")
+            near = h.get("proximity_to_center")
+            dist = h.get("avg_distance_to_attractions")
+            price = h.get("price_per_night", "—")
+            rating = h.get("rating", "—")
+            best = h.get("best_for", "—")
+            amenities = h.get("amenities") or []
+            highlights = h.get("highlights") or []
+            tip = h.get("booking_tip", "—")
+
+            print(f"\n{i}. {name}")
+            print(f"   🏷️  {typ} • {vibe}")
+            print(f"   📍 {loc}")
+            if near:
+                print(f"   Location: {near}")
+            if dist:
+                print(f"   Avg distance to attractions: {dist}km")
+            print(f"   💰 {price} per night")
+            print(f"   ⭐ Rating: {rating}")
+            print(f"   🎯 Best for: {best}")
+            if amenities:
+                print(f"   🛎️  Amenities: {', '.join(amenities[:4])}")
+            if highlights:
+                print(f"   ✨ Highlights: {', '.join(highlights)}")
+            print(f"   💡 Tip: {tip}")
+        print()
+
+    # Warnings (if any)
+    if results.get("errors"):
+        print("\n⚠️  WARNINGS:")
+        for error in results["errors"]:
+            print(f"   • {error}")
+        print()
+
+
+def save_results(results: dict, destination: str):
+    """Save results to JSON file"""
+    output_dir = os.path.join("data", "itineraries")
+    os.makedirs(output_dir, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"{destination.replace(' ', '_').replace(',', '')}_{timestamp}.json"
+    output_file = os.path.join(output_dir, filename)
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
+
+    print(f"\n💾 Full plan saved to: {output_file}")
 
 
 def main():
-    """Main function to run the travel planner"""
-
+    """Main function to run the multi-agent travel planner"""
     # Get user input
-    destination, days, trip_type = get_user_input()
+    destination, days, trip_type, budget, dietary_preferences = get_user_input()
 
     # Show selected options
     print("\n" + "-" * 60)
-    print(" YOUR TRIP DETAILS:")
-    print(f"   Destination: {destination}")
-    print(f"   Duration: {days} days")
-    print(f"   Trip Type: {trip_type}")
+    print("📝 YOUR SELECTIONS:")
+    print(f"   📍 Destination: {destination}")
+    print(f"   📅 Duration: {days} days")
+    print(f"   🎯 Trip Type: {trip_type}")
+    print(f"   💰 Budget: {budget}")
+    if dietary_preferences:
+        print(f"   🍴 Dietary: {', '.join(dietary_preferences)}")
     print("-" * 60 + "\n")
 
-    # Initialize Research Agent
-    logger.info("Initializing Research Agent...")
-    research_agent = ResearchAgent()
+    # Create and run workflow
+    logger.info("Initializing Multi-Agent System...")
+    workflow = create_workflow()
 
-    # Find attractions
-    attractions = research_agent.find_attractions(
-        destination=destination,
-        trip_type=trip_type,
-        days=days,
-    )
-
-    # === Enrich with travel distance/duration (batch Matrix call) ===
-    # 1) Geocode origin (destination city or "center")
+    # Plan the trip (with a small safety net)
     try:
-        start_candidates = geocode(destination, limit=1)
-    except Exception:
-        start_candidates = geocode_fallback_nominatim(destination, limit=1)
-
-    if not start_candidates:
-        print("Could not geocode destination for routing. Skipping travel times.")
-    else:
-        start_latlng = start_candidates[0]
-
-        # 2) Geocode all attractions first (with fallback)
-        dest_points = []
-        for a in attractions:
-            query = f"{a['name']}, {destination}"
-            try:
-                pts = geocode(query, limit=1)
-            except Exception:
-                pts = []
-            if not pts:
-                pts = geocode_fallback_nominatim(query, limit=1)
-            dest_points.append(pts[0] if pts else None)
-
-        # 3) Build a compact list for matrix (only geocoded ones)
-        idx_map = [i for i, p in enumerate(dest_points) if p is not None]
-        matrix_input = [dest_points[i] for i in idx_map]
-
-        # 4) Call ORS Matrix once; if it fails, fall back to per-item directions
-        results = []
-        if matrix_input:
-            try:
-                results = matrix_distances(
-                    start_latlng, matrix_input, profile="driving-car"
-                )
-            except ORSError as e:
-                # Fall back one-by-one (gentle pacing)
-                results = []
-                import time
-                prev_point = start_latlng
-
-                for p in matrix_input:
-                    try:
-                        d_km, h = route_distance_duration(prev_point, p, profile="driving-car")
-
-                        results.append(
-                            {
-                                "distance_km": d_km,
-                                "duration_h": h,
-                                "status": "OK",
-                                "error": None,
-                            }
-                        )
-                        prev_point = p
-
-                    except Exception as ee:
-                        results.append(
-                            {
-                                "distance_km": None,
-                                "duration_h": None,
-                                "status": "ERR",
-                                "error": str(ee),
-                            }
-                        )
-                    time.sleep(0.2)
-
-        # 5) Attach results back to attractions
-        for a in attractions:
-            a["travel"] = a.get("travel") or {}
-
-        j = 0
-        for i in range(len(attractions)):
-            if dest_points[i] is None:
-                attractions[i]["travel"] = {
-                    "distance_km": None,
-                    "duration_h": None,
-                    "note": "geocode_failed",
-                }
-            else:
-                if j < len(results):
-                    r = results[j]
-                    if r.get("status") == "OK":
-                        attractions[i]["travel"] = {
-                            "distance_km": r["distance_km"],
-                            "duration_h": r["duration_h"],
-                            "mode": "driving-car",
-                        }
-                    else:
-                        attractions[i]["travel"] = {
-                            "distance_km": None,
-                            "duration_h": None,
-                            "error": r.get("error") or "matrix_error",
-                        }
-                    j += 1
-                else:
-                    attractions[i]["travel"] = {
-                        "distance_km": None,
-                        "duration_h": None,
-                        "error": "no_matrix_result",
-                    }
-
-    # === Display results (grouped by day) — ADDED DAY-WISE CONSOLE OUTPUT ===
-    groups = split_into_days_evenly(attractions, days)
-
-    print("\n" + "=" * 60)
-    print("RECOMMENDED ITINERARY")
-    print("=" * 60 + "\n")
-
-    for day_idx, day_items in enumerate(groups, start=1):
-        print(f"Day {day_idx}")
-        print("-" * 60)
-
-        for i, attraction in enumerate(day_items, 1):
-            print(f"{i}. {attraction['name']}")
-            print(f"   Category: {attraction['category']}")
-            print(f"   Duration: {attraction['duration']}")
-            print(f"   Best Time: {attraction['best_time']}")
-
-            tr = attraction.get("travel") or {}
-            d = tr.get("distance_km")
-            t = tr.get("duration_h")
-            mode = tr.get("mode", "")
-            if d is not None and t is not None:
-                d_str = _fmt_km(d)
-                t_str = _fmt_hours(t)
-                print(f"   Travel: {d_str} km • {t_str}" + (f" • {mode}" if mode else ""))
-            elif tr.get("note") == "geocode_failed":
-                print("   Travel: distance unavailable (geocode failed)")
-            elif tr.get("error"):
-                print(f"   Travel: distance unavailable ({tr['error']})")
-
-            print(f"   {attraction['description']}\n")
-
-        print()  # blank line between days
-
-    # === Save to file ===
-    output_dir = os.path.join("data", "itineraries")
-    os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(
-        output_dir, f"{destination.replace(' ', '_').replace(',', '')}_attractions.json"
-    )
-
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "destination": destination,
-                "days": days,
-                "trip_type": trip_type,
-                "attractions": attractions,
-            },
-            f,
-            indent=2,
-            ensure_ascii=False,
+        results = workflow.plan_trip(
+            destination=destination,
+            days=days,
+            trip_type=trip_type,
+            budget=budget,
+            dietary_preferences=dietary_preferences,
         )
+        if not isinstance(results, dict):
+            raise TypeError("Workflow returned non-dict results")
+    except Exception as e:
+        logger.exception("Planning failed with an exception.")
+        results = {"success": False, "error": f"{type(e).__name__}: {e}"}
 
-    print(f"Results saved to: {output_file}")
+    # Display results
+    display_results(results)
+
+    # Save to file
+    if results.get("success"):
+        save_results(results, destination)
+
     print("\n" + "=" * 60)
-    print("Trip research complete!")
+    print("✅ Multi-Agent Planning Complete!")
     print("=" * 60 + "\n")
 
 
