@@ -58,9 +58,22 @@ OPENAI_TEMPERATURE=0.7
 ```
 
 **6. Run the App**
+
+**Option A: Web Interface (Streamlit)**
+```bash
+streamlit run streamlit_app.py
+```
+- Opens in your browser at http://localhost:8501
+- User-friendly web interface
+- Visual display of itineraries
+- Download JSON results
+
+**Option B: Command Line**
 ```bash
 python app/main.py
 ```
+- Terminal-based interface
+- Good for quick testing
 
 **7. Use the App**
 - Enter destination (e.g., Paris, France)
@@ -76,11 +89,18 @@ python app/main.py
 voyager-ai/
 ├── app/
 │   ├── agents/              # AI agents
-│   │   └── research_agent.py    # Finds attractions (WORKING)
+│   │   ├── research_agent.py        # Finds attractions
+│   │   ├── itinerary_agent.py       # Creates schedules
+│   │   ├── dining_agent.py          # Restaurant recommendations
+│   │   └── accommodation_agent.py   # Hotel suggestions
+│   ├── services/
+│   │   └── ors_api.py       # OpenRouteService integration
 │   ├── utils/
 │   │   └── logger.py        # Logging utility
 │   ├── config.py            # Settings
-│   └── main.py              # Entry point
+│   ├── main.py              # CLI entry point
+│   └── workflow.py          # Multi-agent orchestration
+├── streamlit_app.py         # Web interface (NEW!)
 ├── .env.example             # Environment template
 ├── requirements.txt         # Dependencies
 └── README.md
@@ -91,13 +111,14 @@ voyager-ai/
 ## Current Features
 
 - ✅ Research Agent (finds attractions using AI)
-- ✅ User input system
-- ✅ Saves itineraries to JSON files
 - ✅ Itinerary Agent - Organize attractions into daily schedule
 - ✅ Dining Agent - Restaurant recommendations
 - ✅ Accommodation Agent - Hotel suggestions
 - ✅ Multi-agent workflow with LangGraph
-- ✅ Maps API integration
+- ✅ Maps API integration (OpenRouteService)
+- ✅ **Streamlit Web Interface** - User-friendly web UI
+- ✅ CLI Interface - Terminal-based interface
+- ✅ Saves itineraries to JSON files
 
 ---
 
@@ -157,9 +178,12 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 
 ## Tech Stack
 
-- Python 3.11
-- LangChain & LangGraph
-- OpenAI GPT-3.5-turbo
+- Python 3.11+
+- LangChain & LangGraph (AI orchestration)
+- OpenAI GPT-3.5-turbo (LLM)
+- OpenRouteService API (geocoding & routing)
+- Streamlit (Web interface)
+- FastAPI (for future API endpoints)
 
 ---
 
@@ -179,7 +203,10 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # Mac/Linux
 
-# Run the app
+# Run the web interface
+streamlit run streamlit_app.py
+
+# Run the CLI interface
 python app/main.py
 
 # Install new package
