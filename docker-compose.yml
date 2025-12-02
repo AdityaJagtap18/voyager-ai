@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  voyager-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voyager-ai
+    ports:
+      - "8501:8501"
+    environment:
+      # These will be loaded from .env file
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.7}
+      - ORS_API_KEY=${ORS_API_KEY}
+    env_file:
+      - .env
+    volumes:
+      # Mount data directory to persist itineraries
+      - ./data:/app/data
+      # Optional: Mount app directory for development (hot reload)
+      # - ./app:/app/app
+      # - ./streamlit_app.py:/app/streamlit_app.py
+    restart: unless-stopped
+    networks:
+      - voyager-network
+
+networks:
+  voyager-network:
+    driver: bridge
