@@ -29,7 +29,7 @@ class AccommodationAgent:
         destination: str,
         trip_type: str,
         days: int,
-        budget: str = "medium",
+        budget: str = "mid-range",
         attractions: List[Dict] = None
     ) -> List[Dict]:
         """
@@ -78,9 +78,14 @@ class AccommodationAgent:
         """Get accommodation recommendations from LLM"""
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a travel accommodation expert.
+            ("system", """You are a travel accommodation expert with knowledge of Indian pricing and preferences.
             Recommend diverse lodging options with SPECIFIC ADDRESSES or landmarks.
-            
+
+            BUDGET GUIDE (Indian context):
+            - Budget: ₹800-2000 per night (backpacker hostels, budget hotels)
+            - Mid-range: ₹2000-5000 per night (comfortable hotels, good amenities)
+            - Premium: ₹5000+ per night (luxury hotels, resorts, heritage properties)
+
             Return ONLY valid JSON array with this format:
             [
                 {{
@@ -88,7 +93,7 @@ class AccommodationAgent:
                     "type": "hotel/hostel/apartment/resort/boutique",
                     "location": "Specific address or landmark",
                     "neighborhood": "District/area name",
-                    "price_per_night": "$50-100",
+                    "price_per_night": "₹2000-3500",
                     "rating": "4.5/5",
                     "amenities": ["wifi", "breakfast", "pool"],
                     "best_for": "couples/families/solo/groups",
@@ -99,15 +104,19 @@ class AccommodationAgent:
                     "description": "Why this place stands out"
                 }}
             ]
-            
-            IMPORTANT: Include specific location details for accurate geocoding.
+
+            IMPORTANT:
+            - Use INR (₹) for all pricing from Indian perspective
+            - Include specific location details for accurate geocoding
+            - Consider value for money that appeals to Indian travelers
             """),
             ("user", """Destination: {destination}
             Trip Type: {trip_type}
             Duration: {days} days
             Budget: {budget}
-            
+
             Recommend 5 accommodation options with specific addresses.
+            Price all recommendations in INR (₹) appropriate for Indian travelers' budget expectations.
             """)
         ])
         

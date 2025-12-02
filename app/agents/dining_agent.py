@@ -90,35 +90,44 @@ class DiningAgent:
         dietary_text = ", ".join(dietary_preferences) if dietary_preferences else "no restrictions"
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a local food expert and restaurant critic.
+            ("system", """You are a local food expert and restaurant critic with knowledge of Indian dining preferences and pricing.
             Recommend diverse dining experiences with SPECIFIC ADDRESSES or neighborhoods.
-            
+
+            PRICING GUIDE (Indian perspective):
+            - Budget (₹): ₹150-400 per person (street food, dhabas, casual eateries)
+            - Mid-range (₹₹): ₹400-1000 per person (good restaurants, cafes)
+            - Premium (₹₹₹): ₹1000+ per person (fine dining, upscale restaurants)
+
             Return ONLY valid JSON array with this format:
             [
                 {{
                     "name": "Restaurant Name",
                     "cuisine": "Italian/French/Local/etc",
-                    "price_range": "$/$$/$$$",
+                    "price_range": "₹/₹₹/₹₹₹",
                     "meal_type": "breakfast/lunch/dinner",
                     "specialties": ["dish1", "dish2"],
                     "atmosphere": "casual/fine dining/street food/etc",
                     "location": "Specific address or well-known intersection",
                     "neighborhood": "District/area name",
                     "must_try": "Signature dish",
-                    "avg_cost": "$15-25 per person",
+                    "avg_cost": "₹300-500 per person",
                     "reservation": "required/recommended/walk-in",
                     "description": "Why visit this place"
                 }}
             ]
-            
-            IMPORTANT: Include specific location details so we can geocode it.
+
+            IMPORTANT:
+            - Use INR (₹) for all pricing from Indian perspective
+            - Include specific location details so we can geocode it
+            - Consider value for money that appeals to Indian diners
             """),
             ("user", """Destination: {destination}
             Trip Type: {trip_type}
             Number needed: {num_restaurants}
             Dietary: {dietary_preferences}
-            
+
             Provide {num_restaurants} restaurants with specific locations.
+            Price all recommendations in INR (₹) appropriate for Indian travelers' budget expectations.
             """)
         ])
         

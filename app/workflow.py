@@ -82,7 +82,7 @@ class MultiAgentWorkflow:
                 destination=state["destination"],
                 trip_type=state["trip_type"],
                 days=state["days"],
-                budget=state.get("budget", "medium"),
+                budget=state.get("budget", "mid-range"),
                 attractions=state["attractions"]
             )
             
@@ -148,7 +148,7 @@ class MultiAgentWorkflow:
             return {"itinerary": {}, "errors": state.get("errors", []) + [str(e)]}
     
     def plan_trip(self, destination: str, days: int, trip_type: str, 
-                  budget: str = "medium", dietary_preferences: List[str] = None) -> Dict:
+                  budget: str = "mid-range", dietary_preferences: List[str] = None) -> Dict:
         """Execute the complete multi-agent workflow"""
         logger.info("=" * 60)
         logger.info("Starting Multi-Agent Travel Planning with Integrated Dining")

@@ -220,12 +220,24 @@ def main():
         )
 
         # Budget
-        budget = st.selectbox(
+        budget_display = st.selectbox(
             "💰 Budget Level",
-            options=["budget", "medium", "luxury"],
+            options=[
+                "Budget (₹800-2000/night, ₹150-400/meal)",
+                "Mid-range (₹2000-5000/night, ₹400-1000/meal)",
+                "Premium (₹5000+/night, ₹1000+/meal)"
+            ],
             index=1,
-            help="Select your budget level"
+            help="Select your budget level (Indian pricing)"
         )
+
+        # Map display to internal value
+        budget_map = {
+            "Budget (₹800-2000/night, ₹150-400/meal)": "budget",
+            "Mid-range (₹2000-5000/night, ₹400-1000/meal)": "mid-range",
+            "Premium (₹5000+/night, ₹1000+/meal)": "premium"
+        }
+        budget = budget_map[budget_display]
 
         # Dietary preferences
         st.subheader("🍴 Dietary Preferences (Optional)")

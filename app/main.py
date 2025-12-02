@@ -64,17 +64,17 @@ def get_user_input():
             print("    ⚠️ Please enter a number between 1 and 7")
 
     # Get budget
-    print("\n💰 Budget Level:")
-    print("   1. Budget-friendly")
-    print("   2. Medium")
-    print("   3. Luxury")
+    print("\n💰 Budget Level (Indian pricing):")
+    print("   1. Budget (₹800-2000/night, ₹150-400/meal)")
+    print("   2. Mid-range (₹2000-5000/night, ₹400-1000/meal)")
+    print("   3. Premium (₹5000+/night, ₹1000+/meal)")
 
-    budget_map = {"1": "budget", "2": "medium", "3": "luxury"}
+    budget_map = {"1": "budget", "2": "mid-range", "3": "premium"}
 
     while True:
-        choice = input("\n   Select budget (1-3, or press Enter for Medium): ").strip()
+        choice = input("\n   Select budget (1-3, or press Enter for Mid-range): ").strip()
         if not choice:
-            budget = "medium"
+            budget = "mid-range"
             break
         elif choice in budget_map:
             budget = budget_map[choice]
