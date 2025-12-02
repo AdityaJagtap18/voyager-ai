@@ -687,40 +687,8 @@ git push origin feature/your-feature-name
 - Test your changes before submitting
 - Keep commits focused and atomic
 
----
-
-## 📄 License
-
-This project is licensed under the **MIT License**.
-
-```
-MIT License
-
-Copyright (c) 2024 Voyager AI
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-```
 
 ---
-
-## 📞 Contact & Support
-
-### Get Help
-
-- **GitHub Issues**: [Report bugs or ask questions](https://github.com/AdityaJagtap18/voyager-ai/issues)
-- **Discussions**: [Join the conversation](https://github.com/AdityaJagtap18/voyager-ai/discussions)
 
 ### Project Maintainer
 
@@ -740,29 +708,10 @@ Built with:
 
 ---
 
-## 🗺️ Roadmap
-
-### Future Enhancements
-
-- [ ] Multi-city trip support
-- [ ] Flight/train booking integration
-- [ ] Weather-based recommendations
-- [ ] User accounts & saved trips
-- [ ] Mobile app (React Native)
-- [ ] Collaborative trip planning
-- [ ] Budget tracking during trip
-- [ ] Photo gallery from destinations
-- [ ] Integration with Booking.com/Airbnb APIs
-- [ ] WhatsApp bot interface
-
----
-
 <div align="center">
 
 ### ⭐ Star this repo if you find it helpful!
 
 **Made with ❤️ by developers who love to travel**
-
-[Report Bug](https://github.com/AdityaJagtap18/voyager-ai/issues) · [Request Feature](https://github.com/AdityaJagtap18/voyager-ai/issues) · [Documentation](https://github.com/AdityaJagtap18/voyager-ai/wiki)
 
 </div>
