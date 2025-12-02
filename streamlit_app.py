@@ -23,7 +23,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS for better styling (dark mode compatible)
 st.markdown("""
     <style>
     .main-header {
@@ -35,23 +35,26 @@ st.markdown("""
     }
     .sub-header {
         text-align: center;
-        color: #666;
+        opacity: 0.7;
         margin-bottom: 2rem;
     }
     .activity-card {
-        background-color: #f0f2f6;
+        background-color: rgba(30, 136, 229, 0.1);
+        border-left: 4px solid #1E88E5;
         padding: 1rem;
         border-radius: 0.5rem;
         margin-bottom: 1rem;
     }
     .restaurant-card {
-        background-color: #fff3e0;
+        background-color: rgba(255, 152, 0, 0.1);
+        border-left: 4px solid #FF9800;
         padding: 1rem;
         border-radius: 0.5rem;
         margin-bottom: 1rem;
     }
     .accommodation-card {
-        background-color: #e8f5e9;
+        background-color: rgba(76, 175, 80, 0.1);
+        border-left: 4px solid #4CAF50;
         padding: 1rem;
         border-radius: 0.5rem;
         margin-bottom: 1rem;
