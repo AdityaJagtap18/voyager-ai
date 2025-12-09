@@ -2,6 +2,7 @@
 # Core AI & LLM
 # ==========================================
 langchain
+langchain-core
 langgraph
 langchain-openai
 langchain-community

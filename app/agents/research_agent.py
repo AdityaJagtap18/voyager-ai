@@ -3,7 +3,7 @@ Research Agent
 Finds attractions and points of interest based on destination and trip type
 """
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from typing import List, Dict
 import json
 
