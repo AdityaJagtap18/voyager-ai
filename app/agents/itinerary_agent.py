@@ -3,7 +3,7 @@ Enhanced Itinerary Agent with Integrated Dining and Travel Time Management
 Organizes attractions AND meals into a complete day schedule with accurate timing
 """
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from typing import List, Dict, Tuple, Optional
 import json
 from math import radians, cos, sin, asin, sqrt

@@ -3,7 +3,7 @@ Accommodation Agent with ORS Integration
 Recommends hotels near main tourist attractions
 """
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from typing import List, Dict, Tuple
 import json
 
