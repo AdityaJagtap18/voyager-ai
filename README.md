@@ -1,4 +1,4 @@
-# 🌍 Voyager AI - Intelligent Travel Planner
+#  Voyager AI - Intelligent Travel Planner
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
@@ -8,7 +8,7 @@
 
 ---
 
-## 📋 Table of Contents
+##  Table of Contents
 
 - [Overview](#overview)
 - [Key Features](#key-features)
@@ -42,7 +42,7 @@ Voyager AI transforms travel planning from a time-consuming task into an automat
 
 ## ✨ Key Features
 
-### 🤖 Multi-Agent Intelligence
+###  Multi-Agent Intelligence
 
 | Agent | Responsibility | Capabilities |
 |-------|---------------|--------------|
@@ -421,7 +421,7 @@ Voyager AI uses an **Indian pricing context** designed for Indian travelers:
 
 ---
 
-## 🔑 API Requirements
+##  API Requirements
 
 ### OpenAI API
 
@@ -710,8 +710,6 @@ Built with:
 
 <div align="center">
 
-### ⭐ Star this repo if you find it helpful!
 
-**Made with ❤️ by developers who love to travel**
 
 </div>
