@@ -695,6 +695,12 @@ git push origin feature/your-feature-name
 **Aditya Jagtap**
 - GitHub: [@AdityaJagtap18](https://github.com/AdityaJagtap18)
 
+**Jahavi Kasar**
+- GitHub: [@JanhaviiSK](https://github.com/JanhaviiSK)
+
+- **Shruti Vichare**
+- GitHub: [@shrutivichare13](https://github.com/shrutivichare13)
+
 ---
 
 ## 🎉 Acknowledgments
