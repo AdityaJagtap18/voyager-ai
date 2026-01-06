@@ -698,7 +698,7 @@ git push origin feature/your-feature-name
 **Jahavi Kasar**
 - GitHub: [@JanhaviiSK](https://github.com/JanhaviiSK)
 
-- **Shruti Vichare**
+**Shruti Vichare**
 - GitHub: [@shrutivichare13](https://github.com/shrutivichare13)
 
 ---
