@@ -21,7 +21,7 @@
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
-- [License](#license)
+
 
 ---
 
