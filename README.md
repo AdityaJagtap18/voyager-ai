@@ -2,7 +2,6 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.11+-green.svg)
-![License](https://img.shields.io/badge/license-MIT-orange.svg)
 
 **Voyager AI** is an intelligent travel planning system powered by multi-agent AI architecture. It automatically generates personalized day-by-day itineraries, restaurant recommendations, and accommodation suggestions with real-time routing and distance calculations.
 
