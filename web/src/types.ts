@@ -129,6 +129,28 @@ export interface AgentInfo {
   data_source: string;
 }
 
+export interface KnowledgeDocumentCreateRequest {
+  destination: string;
+  title: string;
+  content: string;
+}
+
+export interface KnowledgeDocumentSummary {
+  id: string;
+  destination: string;
+  title: string;
+  chunk_count: number;
+  created_at: string;
+}
+
+export interface KnowledgeSearchResult {
+  document_id: string;
+  document_title: string;
+  destination: string;
+  chunk_text: string;
+  score: number;
+}
+
 export const BOOKING_TYPES = ["flight", "hotel", "activity", "other"] as const;
 export const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"] as const;
 export const EXPENSE_CATEGORIES = [

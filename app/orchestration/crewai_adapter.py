@@ -28,6 +28,7 @@ from agents.accommodation_agent import AccommodationAgent
 from agents.dining_agent import DiningAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.research_agent import ResearchAgent
+from rag import get_context_for_destination
 from utils.logger import logger
 
 
@@ -44,6 +45,7 @@ class _TripContext:
     restaurants: List[Dict] = field(default_factory=list)
     itinerary: Dict = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
+    knowledge_context: str = ""
 
 
 class CrewAIOrchestrator:
@@ -71,13 +73,20 @@ class CrewAIOrchestrator:
             budget=budget,
             dietary_preferences=dietary_preferences or [],
         )
+        try:
+            ctx.knowledge_context = get_context_for_destination(destination)
+        except Exception as exc:
+            logger.warning(f"RAG context lookup failed, continuing without it: {exc}")
 
         @tool("research_attractions", result_as_answer=True)
         def research_attractions() -> str:
             """Find attractions for the trip's destination and trip type."""
             try:
                 ctx.attractions = self.research_agent.find_attractions(
-                    destination=ctx.destination, trip_type=ctx.trip_type, days=ctx.days
+                    destination=ctx.destination,
+                    trip_type=ctx.trip_type,
+                    days=ctx.days,
+                    knowledge_context=ctx.knowledge_context,
                 )
             except Exception as exc:
                 ctx.errors.append(str(exc))

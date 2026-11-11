@@ -9,6 +9,7 @@ from agents.research_agent import ResearchAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.dining_agent import DiningAgent
 from agents.accommodation_agent import AccommodationAgent
+from rag import get_context_for_destination
 from utils.logger import logger
 
 
@@ -19,6 +20,7 @@ class TravelPlanState(TypedDict):
     trip_type: str
     budget: str
     dietary_preferences: List[str]
+    knowledge_context: str
     attractions: List[Dict]
     itinerary: Dict
     restaurants: List[Dict]
@@ -69,7 +71,8 @@ class MultiAgentWorkflow:
             attractions = self.research_agent.find_attractions(
                 destination=state["destination"],
                 trip_type=state["trip_type"],
-                days=state["days"]
+                days=state["days"],
+                knowledge_context=state.get("knowledge_context")
             )
             logger.info(f"Research complete: {len(attractions)} attractions found")
             return {"attractions": attractions, "current_step": "research_complete"}
@@ -157,12 +160,19 @@ class MultiAgentWorkflow:
         logger.info("Starting Multi-Agent Travel Planning with Integrated Dining")
         logger.info("=" * 60)
         
+        try:
+            knowledge_context = get_context_for_destination(destination)
+        except Exception as e:
+            logger.warning(f"RAG context lookup failed, continuing without it: {e}")
+            knowledge_context = ""
+
         initial_state: TravelPlanState = {
             "destination": destination,
             "days": days,
             "trip_type": trip_type,
             "budget": budget,
             "dietary_preferences": dietary_preferences or [],
+            "knowledge_context": knowledge_context,
             "attractions": [],
             "itinerary": {},
             "restaurants": [],

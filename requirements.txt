@@ -19,6 +19,9 @@ langchain-litellm
 # if not installed, same pattern as an unconfigured model provider.
 crewai
 
+# Phase 7: RAG knowledge base (app/rag) and MCP server (app/mcp_server.py)
+mcp
+
 # ==========================================
 # API Framework
 # ==========================================

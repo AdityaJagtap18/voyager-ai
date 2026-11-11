@@ -111,3 +111,25 @@ class Expense(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class KnowledgeDocumentCreateRequest(BaseModel):
+    destination: str = Field(..., min_length=2, max_length=255, examples=["Goa, India"])
+    title: str = Field(..., min_length=1, max_length=255, examples=["Local tips"])
+    content: str = Field(..., min_length=20, max_length=20000)
+
+
+class KnowledgeDocumentSummary(BaseModel):
+    id: str
+    destination: str
+    title: str
+    chunk_count: int
+    created_at: datetime
+
+
+class KnowledgeSearchResult(BaseModel):
+    document_id: str
+    document_title: str
+    destination: str
+    chunk_text: str
+    score: float

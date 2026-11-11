@@ -64,13 +64,15 @@ def _build_orchestrator_with_mocked_agents():
 def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
     orchestrator, mocks = _build_orchestrator_with_mocked_agents()
 
-    with patch("orchestration.crewai_adapter.Crew", _FakeCrew):
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ):
         result = orchestrator.plan_trip(
             destination="Mumbai, India", days=2, trip_type="historic", budget="mid-range", dietary_preferences=["vegetarian"]
         )
 
     mocks["research"].find_attractions.assert_called_once_with(
-        destination="Mumbai, India", trip_type="historic", days=2
+        destination="Mumbai, India", trip_type="historic", days=2, knowledge_context=""
     )
     mocks["accommodation"].find_accommodations.assert_called_once()
     mocks["dining"].find_restaurants.assert_called_once()
@@ -88,7 +90,9 @@ def test_plan_trip_collects_errors_without_crashing():
     orchestrator, mocks = _build_orchestrator_with_mocked_agents()
     mocks["research"].find_attractions.side_effect = RuntimeError("provider down")
 
-    with patch("orchestration.crewai_adapter.Crew", _FakeCrew):
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ):
         result = orchestrator.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 
     assert result["success"] is True  # the crew itself didn't crash, just one tool errored
@@ -101,7 +105,9 @@ def test_plan_trip_reports_failure_if_crew_kickoff_raises():
 
     broken_crew = MagicMock()
     broken_crew.kickoff.side_effect = RuntimeError("litellm.AuthenticationError")
-    with patch("orchestration.crewai_adapter.Crew", return_value=broken_crew):
+    with patch("orchestration.crewai_adapter.Crew", return_value=broken_crew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ):
         result = orchestrator.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 
     assert result["success"] is False

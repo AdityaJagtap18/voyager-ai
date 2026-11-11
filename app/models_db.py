@@ -8,7 +8,7 @@ could otherwise be mistaken for LLM model config, which belongs to a later phase
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, JSON
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
 
 from app.db import Base
 
@@ -64,6 +64,31 @@ class Booking(Base):
     notes = Column(String(2000), nullable=True)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# Phase 7: RAG knowledge base. A document (e.g. a traveler's notes or a guide
+# for a destination) is split into chunks, each embedded separately so search
+# can retrieve the specific passage that matches a query instead of the whole
+# document.
+class KnowledgeDocument(Base):
+    __tablename__ = "knowledge_documents"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    destination = Column(String(255), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    document_id = Column(String(32), ForeignKey("knowledge_documents.id"), nullable=False, index=True)
+    chunk_index = Column(Integer, nullable=False)
+    text = Column(Text, nullable=False)
+    embedding = Column(JSON, nullable=False)  # list[float]
 
 
 class Expense(Base):

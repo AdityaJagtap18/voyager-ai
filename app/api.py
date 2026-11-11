@@ -11,7 +11,7 @@ Run with:
 import os
 import sys
 from contextlib import asynccontextmanager
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +45,7 @@ from orchestration import (  # noqa: E402
     is_available as is_framework_available,
     resolve_framework,
 )
+from rag import EmbeddingUnavailableError, ingest_document, list_documents, search_knowledge  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -58,6 +59,9 @@ from app.schemas import (  # noqa: E402
     Expense,
     ExpenseCreateRequest,
     FrameworkInfoResponse,
+    KnowledgeDocumentCreateRequest,
+    KnowledgeDocumentSummary,
+    KnowledgeSearchResult,
     ModelInfoResponse,
     TripBudgetUpdate,
     TripCreateRequest,
@@ -148,6 +152,42 @@ def list_frameworks():
 @app.get("/api/agents", response_model=List[AgentInfoResponse])
 def list_agents():
     return [AgentInfoResponse(**agent) for agent in AGENT_CATALOG]
+
+
+# --- RAG Knowledge Base (Phase 7) -----------------------------------------------
+# Free-text notes/guides about a destination, embedded and retrieved by
+# similarity (app/rag). The research agent (app/agents/research_agent.py)
+# automatically grounds itself in whatever's here for a matching destination.
+
+@app.post("/api/knowledge", response_model=KnowledgeDocumentSummary, status_code=201)
+def create_knowledge_document(payload: KnowledgeDocumentCreateRequest, db: Session = Depends(get_db)):
+    try:
+        document, chunk_count = ingest_document(payload.destination, payload.title, payload.content, db=db)
+    except EmbeddingUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return KnowledgeDocumentSummary(
+        id=document.id,
+        destination=document.destination,
+        title=document.title,
+        chunk_count=chunk_count,
+        created_at=document.created_at,
+    )
+
+
+@app.get("/api/knowledge", response_model=List[KnowledgeDocumentSummary])
+def list_knowledge_documents(db: Session = Depends(get_db)):
+    return [KnowledgeDocumentSummary(**doc) for doc in list_documents(db=db)]
+
+
+@app.get("/api/knowledge/search", response_model=List[KnowledgeSearchResult])
+def search_knowledge_documents(
+    query: str, destination: Optional[str] = None, top_k: int = 5, db: Session = Depends(get_db)
+):
+    try:
+        results = search_knowledge(query, destination=destination, top_k=top_k, db=db)
+    except EmbeddingUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
+    return [KnowledgeSearchResult(**r) for r in results]
 
 
 @app.get("/api/trips", response_model=List[TripSummary])

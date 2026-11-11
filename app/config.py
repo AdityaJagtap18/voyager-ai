@@ -23,6 +23,12 @@ class Config:
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
 
+    # Phase 7: embedding model for the RAG knowledge base (app/rag). Only
+    # OpenAI-compatible embedding models are wired up today, so this still
+    # needs OPENAI_API_KEY above — a future phase can extend app/rag/embeddings.py
+    # the same way app/llm_gateway.py supports multiple chat providers.
+    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+
     # Application Settings
     APP_NAME = "Voyager"
     APP_VERSION = "0.1.0"

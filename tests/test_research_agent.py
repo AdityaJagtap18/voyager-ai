@@ -52,6 +52,44 @@ def test_find_attractions_parses_markdown_fenced_json():
     assert attractions[0]["name"] == "Elephanta Caves"
 
 
+def test_find_attractions_includes_knowledge_context_in_invoke_payload():
+    agent = _agent_with_fake_llm()
+
+    fake_response = MagicMock()
+    fake_response.content = '[{"name": "Gateway of India"}]'
+    agent.llm = MagicMock()
+    with patch("agents.research_agent.ChatPromptTemplate.from_messages") as from_messages:
+        fake_prompt = MagicMock()
+        fake_chain = MagicMock()
+        fake_chain.invoke.return_value = fake_response
+        fake_prompt.__or__.return_value = fake_chain
+        from_messages.return_value = fake_prompt
+
+        agent.find_attractions("Mumbai, India", "historic", 2, knowledge_context="Carry cash for beach shacks.")
+
+    invoke_payload = fake_chain.invoke.call_args[0][0]
+    assert "Carry cash for beach shacks." in invoke_payload["knowledge_context"]
+
+
+def test_find_attractions_omits_knowledge_context_when_none_given():
+    agent = _agent_with_fake_llm()
+
+    fake_response = MagicMock()
+    fake_response.content = '[{"name": "Gateway of India"}]'
+    agent.llm = MagicMock()
+    with patch("agents.research_agent.ChatPromptTemplate.from_messages") as from_messages:
+        fake_prompt = MagicMock()
+        fake_chain = MagicMock()
+        fake_chain.invoke.return_value = fake_response
+        fake_prompt.__or__.return_value = fake_chain
+        from_messages.return_value = fake_prompt
+
+        agent.find_attractions("Mumbai, India", "historic", 2)
+
+    invoke_payload = fake_chain.invoke.call_args[0][0]
+    assert invoke_payload["knowledge_context"] == ""
+
+
 def test_find_attractions_returns_error_response_on_exception():
     agent = _agent_with_fake_llm()
     agent.llm = MagicMock()

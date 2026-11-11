@@ -19,19 +19,24 @@ class ResearchAgent:
         logger.info(" Research Agent initialized")
     
     def find_attractions(
-        self, 
-        destination: str, 
-        trip_type: str, 
-        days: int
+        self,
+        destination: str,
+        trip_type: str,
+        days: int,
+        knowledge_context: Optional[str] = None
     ) -> List[Dict]:
         """
         Find attractions for the given destination
-        
+
         Args:
             destination: City/location (e.g., "Paris, France")
             trip_type: Type of trip (historic, adventure, foodie, relaxation, cultural)
             days: Number of days for the trip
-            
+            knowledge_context: Optional grounding text retrieved from the RAG
+                knowledge base (app/rag, Phase 7) for this destination — notes
+                a traveler added, not the agent's own LLM knowledge. Empty/None
+                when nothing's been added for this destination (the default).
+
         Returns:
             List of attractions with details
         """
@@ -64,19 +69,26 @@ class ResearchAgent:
             - Include variety in categories
             - Be specific to {destination}
             - Return ONLY the JSON array, no other text
+
+            {knowledge_context}
             """),
             ("user", "Destination: {destination}\nTrip Type: {trip_type}\nDays: {days}")
         ])
-        
+
         # Create the chain and invoke
         chain = prompt | self.llm
-        
+
         try:
             response = chain.invoke({
                 "destination": destination,
                 "trip_type": trip_type,
                 "days": days,
-                "num_attractions": num_attractions
+                "num_attractions": num_attractions,
+                "knowledge_context": (
+                    f"Traveler notes for this destination (use only if genuinely relevant; "
+                    f"don't contradict real attractions):\n{knowledge_context}"
+                    if knowledge_context else ""
+                )
             })
             
             # Parse the response

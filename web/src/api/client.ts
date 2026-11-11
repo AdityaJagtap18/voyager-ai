@@ -3,6 +3,9 @@ import type {
   Booking,
   BookingCreateRequest,
   FrameworkInfo,
+  KnowledgeDocumentCreateRequest,
+  KnowledgeDocumentSummary,
+  KnowledgeSearchResult,
   ModelInfo,
   TripCreateRequest,
   TripDetail,
@@ -64,4 +67,13 @@ export const api = {
     request<TripExpense>(`/api/trips/${tripId}/expenses`, { method: "POST", body: JSON.stringify(payload) }),
   deleteExpense: (tripId: string, expenseId: string) =>
     request<void>(`/api/trips/${tripId}/expenses/${expenseId}`, { method: "DELETE" }),
+
+  listKnowledge: () => request<KnowledgeDocumentSummary[]>("/api/knowledge"),
+  createKnowledge: (payload: KnowledgeDocumentCreateRequest) =>
+    request<KnowledgeDocumentSummary>("/api/knowledge", { method: "POST", body: JSON.stringify(payload) }),
+  searchKnowledge: (query: string, destination?: string, top_k = 5) => {
+    const params = new URLSearchParams({ query, top_k: String(top_k) });
+    if (destination) params.set("destination", destination);
+    return request<KnowledgeSearchResult[]>(`/api/knowledge/search?${params.toString()}`);
+  },
 };
