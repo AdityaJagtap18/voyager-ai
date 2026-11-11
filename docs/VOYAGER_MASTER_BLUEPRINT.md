@@ -129,7 +129,7 @@ Each phase below is sized to be independently committable and testable. Phases 0
 |---|---|---|---|---|
 | 0 | Repository audit, git baseline, this document | **COMPLETE** | — | none |
 | 1 | Architecture foundation: fix config side-effects, add `.env.example`, pytest scaffold, CI skeleton | **COMPLETE** | Phase 0 | none |
-| 2 | FastAPI backend wrapping existing workflow + persistence (Postgres/SQLite) + React frontend using the existing SVG library and UI reference images | NOT STARTED | Phase 1 | review of the 4 UI reference images |
+| 2 | FastAPI backend wrapping existing workflow + persistence (Postgres/SQLite) + React frontend using the existing SVG library and UI reference images | **COMPLETE** | Phase 1 | none |
 | 3 | Real travel providers (flights/hotels/weather/maps) replacing GPT-generated placeholder data | NOT STARTED | Phase 2 | provider API keys (Amadeus, etc.) |
 | 4 | Trip management: bookings/wallet, expenses, documents, collaboration | NOT STARTED | Phase 3 | none |
 | 5 | Model gateway (LiteLLM), provider-agnostic routing | NOT STARTED | Phase 1 | optional provider keys (Ollama needs none) |
@@ -165,6 +165,25 @@ A phase is complete when: code compiles/runs, relevant tests pass (fixtures used
 - Added `pytest.ini` and `.github/workflows/ci.yml` (runs the test suite on push/PR to `main`). A `flake8` step is included but set to informational/non-blocking (`|| true`): the existing agent modules carry ~285 pre-existing style warnings (trailing whitespace, a few bare `except`, long lines) that are out of scope for Phase 1 to silently rewrite. Recorded as **R5** below for a future, dedicated style-cleanup pass rather than bundled into this phase's gate.
 - **R5 — Pre-existing lint debt**: `app/agents/*.py` and `app/services/ors_api.py` have ~285 flake8 warnings (mostly `W293` trailing whitespace, a handful of bare `except:` in `itinerary_agent.py` lines 234/249/431/463). Not fixed in Phase 1 to avoid touching working code beyond this phase's stated scope. Candidate for a small, dedicated cleanup PR before or during Phase 2.
 
+## 9. Phase 2 Delivery Notes
+
+**Backend** (`app/api.py`, `app/db.py`, `app/models_db.py`, `app/schemas.py`):
+- FastAPI app with `POST /api/trips`, `GET /api/trips`, `GET /api/trips/{id}`, `GET /api/health`. Wraps `create_workflow()`/`plan_trip()` from `app/workflow.py` completely unchanged — the agents are untouched.
+- Persistence via SQLAlchemy, SQLite by default at `data/voyager.db` (gitignored), swappable to Postgres by setting `DATABASE_URL`; no code changes needed for that swap.
+- Returns `503` if `OPENAI_API_KEY` is missing, `422` for an invalid `trip_type`/`budget`, `404` for an unknown trip id. A workflow-level exception is caught and stored as a `failed` trip rather than a 500, so the frontend always has something to render.
+- 6 new tests in `tests/test_api.py` (17 total now pass) against an isolated temp SQLite db with a mocked workflow — no OpenAI/ORS calls.
+- Manually verified end-to-end in the browser: booted the server with a deliberately invalid `OPENAI_API_KEY`, submitted a real trip through the UI, and confirmed the existing `research_agent.py` error-handling path (it catches the OpenAI 401 and returns a placeholder "Error occurred" attraction rather than crashing) surfaces correctly all the way to the Itinerary tab. With a real key this is the same code path that returns a real itinerary.
+
+**Frontend** (`web/`, Vite + React 18 + TypeScript + Tailwind):
+- Sidebar navigation matches the UI reference images in `docs/design/references/`: "Travel Workspace" and "AI Engineering Workspace" sections, same item set, same light/indigo palette (colors sampled into `web/tailwind.config.js`'s `brand`/`ink`/`surface` tokens).
+- Uses the existing SVG asset library directly (`web/public/icons/`, copied verbatim from `Voyager-AI-SVG-Components/` — no assets recreated or replaced) for the logo, nav icons, and quick-link icons.
+- Implemented screens: Home (hero, quick links, recent trips), Plan a Trip (form → `POST /api/trips`), My Trips (list), Trip Detail (Itinerary/Restaurants/Accommodations tabs, rendering the real nested `plan.itinerary.itinerary[]` day/activity structure that `itinerary_agent.py` actually returns).
+- Nav items for Bookings & Wallet, Budget & Expenses, Group Trips, Travel Companion, and every AI Engineering Workspace item route to an explicit "coming in a later phase" page rather than a dead or fake-functional control — those are real Phase 3+/5+ scope (Section 5), not reused from anywhere.
+- Restaurant/accommodation cards render their raw JSON for now (shape varies per agent output) rather than a hand-built layout guessing at fields — flagged as a nice-to-have polish item, not a blocker.
+- `npm run build` passes with zero TypeScript errors. `.github/workflows/ci.yml` now has a second `frontend` job (`npm ci && npm run build`) alongside the existing `backend` job.
+
+**Not done in Phase 2** (explicitly out of scope per Section 5): real flight/hotel/weather/maps provider data (Phase 3), budget tracking, group collaboration, bookings/wallet (Phase 4), and all AI Engineering Workspace functionality (Phases 5–9). The quick-link tiles on Home (Flights/Hotels/Weather/Maps) are visual only and not wired to anything yet — they reuse the reference design's layout but have no destination pages until Phase 3.
+
 ## Next step
 
-Phase 0 and Phase 1 are both complete and committed. Phases 2+ are each a significant, separately-scoped effort — recommend tackling them one at a time with a review checkpoint after each, starting with Phase 2 (FastAPI backend + persistence + new frontend) once the UI reference images have been reviewed.
+Phases 0–2 are complete and committed. Phase 3 (real travel providers — flights, hotels, weather, maps replacing the GPT-generated placeholder data) needs provider credentials (Amadeus, etc.) that only the user can supply; Phase 4 (bookings/wallet/budget/collaboration) and Phase 5 (model gateway) don't have that blocker and could go next. Recommend picking one explicitly rather than continuing to the next phase number by default, since the remaining phases are no longer small.
