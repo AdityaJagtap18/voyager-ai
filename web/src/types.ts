@@ -287,6 +287,18 @@ export interface WeatherForecast {
   days: WeatherDay[];
 }
 
+export interface MapPlace {
+  label: string | null;
+  lat: number;
+  lng: number;
+}
+
+export interface MapRoute {
+  distance_km: number;
+  duration_h: number;
+  geometry: [number, number][];
+}
+
 export interface GuardrailScanResult {
   risk: "none" | "medium" | "high";
   categories: string[];

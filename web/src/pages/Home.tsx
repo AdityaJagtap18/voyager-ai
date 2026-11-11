@@ -9,7 +9,7 @@ const quickLinks = [
   { label: "Itinerary", sub: "AI-optimized", icon: "Travel/itinerary.svg", to: "/plan" },
   { label: "Weather", sub: "Forecast & alerts", icon: "Travel/weather.svg", to: "/weather" },
   { label: "Budget", sub: "Plan & track", icon: "Navigation/budget.svg", to: "/budget" },
-  { label: "Maps", sub: "Routes & explore", icon: "Travel/map.svg", to: null },
+  { label: "Maps", sub: "Routes & explore", icon: "Travel/map.svg", to: "/maps" },
 ];
 
 const statusBadge: Record<string, string> = {

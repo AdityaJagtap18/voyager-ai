@@ -681,3 +681,64 @@ def test_weather_forecast_502_on_provider_error(monkeypatch):
     monkeypatch.setattr(api_module.weather_api, "get_forecast", boom)
     resp = client.get("/api/weather/forecast", params={"destination": "Goa"})
     assert resp.status_code == 502
+
+
+def test_maps_search_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", None)
+    resp = client.get("/api/maps/search", params={"query": "Mumbai"})
+    assert resp.status_code == 503
+
+
+def test_maps_search_returns_parsed_places(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", "test-key")
+    fake_places = [{"label": "Mumbai, India", "lat": 19.076, "lng": 72.8777}]
+    monkeypatch.setattr(api_module.ors_api, "search_places", lambda query: fake_places)
+    resp = client.get("/api/maps/search", params={"query": "Mumbai"})
+    assert resp.status_code == 200
+    assert resp.json() == fake_places
+
+
+def test_maps_search_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", "test-key")
+
+    def boom(query):
+        raise api_module.ORSError("provider failed")
+
+    monkeypatch.setattr(api_module.ors_api, "search_places", boom)
+    resp = client.get("/api/maps/search", params={"query": "Mumbai"})
+    assert resp.status_code == 502
+
+
+def test_maps_route_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", None)
+    resp = client.get(
+        "/api/maps/route",
+        params={"origin_lat": 19.076, "origin_lng": 72.8777, "dest_lat": 15.4909, "dest_lng": 73.8278},
+    )
+    assert resp.status_code == 503
+
+
+def test_maps_route_returns_parsed_route(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", "test-key")
+    fake_route = {"distance_km": 594.0, "duration_h": 10.0, "geometry": [[19.076, 72.8777], [15.4909, 73.8278]]}
+    monkeypatch.setattr(api_module.ors_api, "get_route", lambda *a, **k: fake_route)
+    resp = client.get(
+        "/api/maps/route",
+        params={"origin_lat": 19.076, "origin_lng": 72.8777, "dest_lat": 15.4909, "dest_lng": 73.8278},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == fake_route
+
+
+def test_maps_route_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.ors_api, "ORS_API_KEY", "test-key")
+
+    def boom(*a, **k):
+        raise api_module.ORSError("provider failed")
+
+    monkeypatch.setattr(api_module.ors_api, "get_route", boom)
+    resp = client.get(
+        "/api/maps/route",
+        params={"origin_lat": 19.076, "origin_lng": 72.8777, "dest_lat": 15.4909, "dest_lng": 73.8278},
+    )
+    assert resp.status_code == 502

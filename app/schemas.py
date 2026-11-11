@@ -245,6 +245,18 @@ class WeatherForecastResponse(BaseModel):
     days: List[WeatherDay]
 
 
+class PlaceResult(BaseModel):
+    label: Optional[str] = None
+    lat: float
+    lng: float
+
+
+class RouteResponse(BaseModel):
+    distance_km: float
+    duration_h: float
+    geometry: List[List[float]]
+
+
 class GuardrailEventSummary(BaseModel):
     id: str
     source: str

@@ -51,9 +51,10 @@ from rag import EmbeddingUnavailableError, ingest_document, list_documents, sear
 from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
 from guardrails import is_blocked, scan_text  # noqa: E402
 from documents import DocumentTooLargeError, delete_document_file, save_document_bytes  # noqa: E402
-from services import flights_api, hotels_api, weather_api  # noqa: E402
+from services import flights_api, hotels_api, ors_api, weather_api  # noqa: E402
 from services.flights_api import FlightsAPIError  # noqa: E402
 from services.hotels_api import HotelsAPIError  # noqa: E402
+from services.ors_api import ORSError  # noqa: E402
 from services.weather_api import WeatherAPIError  # noqa: E402
 from app.models_db import EvaluationRun, GuardrailEvent, TripDocument  # noqa: E402
 from app.schemas import (  # noqa: E402
@@ -81,7 +82,9 @@ from app.schemas import (  # noqa: E402
     KnowledgeDocumentSummary,
     KnowledgeSearchResult,
     ModelInfoResponse,
+    PlaceResult,
     PublicTripView,
+    RouteResponse,
     ShareLinkResponse,
     TripBudgetUpdate,
     TripCreateRequest,
@@ -637,4 +640,30 @@ def weather_forecast(destination: str):
     try:
         return weather_api.get_forecast(destination)
     except WeatherAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/maps/search", response_model=List[PlaceResult])
+def maps_search(query: str):
+    if not ors_api.ORS_API_KEY:
+        raise HTTPException(status_code=503, detail="ORS_API_KEY not configured on the server")
+    try:
+        return ors_api.search_places(query)
+    except ORSError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/maps/route", response_model=RouteResponse)
+def maps_route(
+    origin_lat: float,
+    origin_lng: float,
+    dest_lat: float,
+    dest_lng: float,
+    profile: str = "driving-car",
+):
+    if not ors_api.ORS_API_KEY:
+        raise HTTPException(status_code=503, detail="ORS_API_KEY not configured on the server")
+    try:
+        return ors_api.get_route((origin_lat, origin_lng), (dest_lat, dest_lng), profile=profile)
+    except ORSError as exc:
         raise HTTPException(status_code=502, detail=str(exc))

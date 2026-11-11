@@ -16,6 +16,7 @@ import SharedTrip from "./pages/SharedTrip";
 import Flights from "./pages/Flights";
 import Hotels from "./pages/Hotels";
 import Weather from "./pages/Weather";
+import Maps from "./pages/Maps";
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/flights" element={<Flights />} />
         <Route path="/hotels" element={<Hotels />} />
         <Route path="/weather" element={<Weather />} />
+        <Route path="/maps" element={<Maps />} />
         <Route path="/group-trips" element={<ComingSoon title="Group Trips" />} />
         <Route path="/companion" element={<ComingSoon title="Travel Companion" />} />
 

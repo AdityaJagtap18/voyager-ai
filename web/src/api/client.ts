@@ -13,6 +13,8 @@ import type {
   KnowledgeDocumentCreateRequest,
   KnowledgeDocumentSummary,
   KnowledgeSearchResult,
+  MapPlace,
+  MapRoute,
   ModelInfo,
   PlaceSuggestion,
   PublicTripView,
@@ -187,4 +189,16 @@ export const api = {
 
   weatherForecast: (destination: string) =>
     request<WeatherForecast>(`/api/weather/forecast?${new URLSearchParams({ destination })}`),
+
+  mapsSearch: (query: string) =>
+    request<MapPlace[]>(`/api/maps/search?${new URLSearchParams({ query })}`),
+  mapsRoute: (origin: MapPlace, destination: MapPlace) =>
+    request<MapRoute>(
+      `/api/maps/route?${new URLSearchParams({
+        origin_lat: String(origin.lat),
+        origin_lng: String(origin.lng),
+        dest_lat: String(destination.lat),
+        dest_lng: String(destination.lng),
+      })}`
+    ),
 };
