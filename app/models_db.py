@@ -45,6 +45,11 @@ class Trip(Base):
     # FRAMEWORK_REGISTRY — "langgraph" or "crewai") actually ran this trip.
     framework = Column(String(50), nullable=True)
 
+    # Phase 8: per-agent-step timing/status trace emitted by the orchestrator
+    # that ran this trip ({step, duration_ms, status, error?} per entry) —
+    # observability into where time was spent and what failed, if anything.
+    trace = Column(JSON, nullable=False, default=list)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
@@ -89,6 +94,22 @@ class KnowledgeChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     text = Column(Text, nullable=False)
     embedding = Column(JSON, nullable=False)  # list[float]
+
+
+# Phase 8: a run of the evaluation harness (app/evaluation/__init__.py) against
+# a fixed set of canned cases, for one model/framework combination.
+class EvaluationRun(Base):
+    __tablename__ = "evaluation_runs"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    model = Column(String(100), nullable=True)
+    framework = Column(String(50), nullable=True)
+
+    pass_count = Column(Integer, nullable=False, default=0)
+    fail_count = Column(Integer, nullable=False, default=0)
+    results = Column(JSON, nullable=False, default=list)  # [{case_id, passed, reason, duration_ms}]
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class Expense(Base):

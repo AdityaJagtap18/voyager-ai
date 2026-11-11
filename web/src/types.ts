@@ -86,6 +86,13 @@ export interface TripPlan {
   accommodations: Accommodation[];
 }
 
+export interface TraceEntry {
+  step: string;
+  duration_ms: number;
+  status: "success" | "error";
+  error?: string;
+}
+
 export interface TripDetail extends TripSummary {
   dietary_preferences: string[];
   plan: TripPlan | null;
@@ -93,6 +100,7 @@ export interface TripDetail extends TripSummary {
   budget_amount: number | null;
   model: string | null;
   framework: string | null;
+  trace: TraceEntry[];
 }
 
 export interface TripCreateRequest {
@@ -196,4 +204,30 @@ export interface ExpenseCreateRequest {
   category: string;
   description?: string;
   amount: number;
+}
+
+export interface EvaluationRunRequest {
+  model?: string;
+  framework?: string;
+}
+
+export interface EvaluationCaseResult {
+  case_id: string;
+  description: string;
+  passed: boolean;
+  reason: string;
+  duration_ms: number;
+}
+
+export interface EvaluationRunSummary {
+  id: string;
+  model: string | null;
+  framework: string | null;
+  pass_count: number;
+  fail_count: number;
+  created_at: string;
+}
+
+export interface EvaluationRunDetail extends EvaluationRunSummary {
+  results: EvaluationCaseResult[];
 }

@@ -40,6 +40,7 @@ class TripDetail(TripSummary):
     budget_amount: Optional[float] = None
     model: Optional[str] = None
     framework: Optional[str] = None
+    trace: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class ModelInfoResponse(BaseModel):
@@ -133,3 +134,31 @@ class KnowledgeSearchResult(BaseModel):
     destination: str
     chunk_text: str
     score: float
+
+
+class EvaluationRunRequest(BaseModel):
+    model: Optional[str] = Field(None, description="Model id to evaluate; omit for the configured default")
+    framework: Optional[str] = Field(None, description="Orchestration framework id to evaluate; omit for the default (langgraph)")
+
+
+class EvaluationCaseResult(BaseModel):
+    case_id: str
+    description: str
+    passed: bool
+    reason: str
+    duration_ms: float
+
+
+class EvaluationRunSummary(BaseModel):
+    id: str
+    model: Optional[str]
+    framework: Optional[str]
+    pass_count: int
+    fail_count: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EvaluationRunDetail(EvaluationRunSummary):
+    results: List[EvaluationCaseResult]

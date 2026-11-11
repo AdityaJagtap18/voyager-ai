@@ -46,6 +46,8 @@ from orchestration import (  # noqa: E402
     resolve_framework,
 )
 from rag import EmbeddingUnavailableError, ingest_document, list_documents, search_knowledge  # noqa: E402
+from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
+from app.models_db import EvaluationRun  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -56,6 +58,9 @@ from app.schemas import (  # noqa: E402
     Booking,
     BookingCreateRequest,
     BookingStatusUpdate,
+    EvaluationRunDetail,
+    EvaluationRunRequest,
+    EvaluationRunSummary,
     Expense,
     ExpenseCreateRequest,
     FrameworkInfoResponse,
@@ -263,6 +268,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         trip.status = "complete"
         trip.plan = result.get("plan")
         trip.errors = result.get("errors") or []
+        trip.trace = result.get("trace") or []
     else:
         trip.status = "failed"
         trip.errors = [result.get("error", "Unknown planning error")]
@@ -362,3 +368,52 @@ def delete_expense(trip_id: str, expense_id: str, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Expense not found")
     db.delete(expense)
     db.commit()
+
+
+# --- Evaluations (Phase 8) -------------------------------------------------------
+# A fixed set of canned trip-planning cases (app/evaluation), run against a real
+# model/framework and graded automatically, so regressions (a broken agent, a
+# misconfigured provider) show up as failing cases instead of a vibe check.
+
+@app.post("/api/evaluations", response_model=EvaluationRunDetail, status_code=201)
+def create_evaluation_run(payload: EvaluationRunRequest, db: Session = Depends(get_db)):
+    if payload.model and payload.model not in MODEL_REGISTRY:
+        raise HTTPException(status_code=422, detail=f"model must be one of {list(MODEL_REGISTRY)}")
+    if payload.framework and payload.framework not in FRAMEWORK_REGISTRY:
+        raise HTTPException(status_code=422, detail=f"framework must be one of {list(FRAMEWORK_REGISTRY)}")
+
+    model_id = resolve_model(payload.model)
+    framework_id = resolve_framework(payload.framework)
+    if not is_framework_available(framework_id):
+        raise HTTPException(status_code=503, detail=f"Framework '{framework_id}' isn't installed on the server")
+
+    results = run_eval_suite(model=model_id, framework=framework_id)
+    run = EvaluationRun(
+        model=model_id,
+        framework=framework_id,
+        pass_count=sum(1 for r in results if r["passed"]),
+        fail_count=sum(1 for r in results if not r["passed"]),
+        results=results,
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+@app.get("/api/evaluations", response_model=List[EvaluationRunSummary])
+def list_evaluation_runs(db: Session = Depends(get_db)):
+    return db.query(EvaluationRun).order_by(EvaluationRun.created_at.desc()).all()
+
+
+@app.get("/api/evaluations/{run_id}", response_model=EvaluationRunDetail)
+def get_evaluation_run(run_id: str, db: Session = Depends(get_db)):
+    run = db.get(EvaluationRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Evaluation run not found")
+    return run
+
+
+@app.get("/api/evaluations/cases/list")
+def list_evaluation_cases():
+    return [{"id": c["id"], "description": c["description"]} for c in EVAL_CASES]

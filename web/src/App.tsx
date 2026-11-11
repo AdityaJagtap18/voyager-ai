@@ -9,6 +9,8 @@ import ComingSoon from "./pages/ComingSoon";
 import ModelsRouting from "./pages/ModelsRouting";
 import AgentStudio from "./pages/AgentStudio";
 import RagKnowledge from "./pages/RagKnowledge";
+import Observability from "./pages/Observability";
+import Evaluations from "./pages/Evaluations";
 
 export default function App() {
   return (
@@ -46,8 +48,8 @@ export default function App() {
         <Route path="/ai/models" element={<ModelsRouting />} />
         <Route path="/ai/rag" element={<RagKnowledge />} />
         <Route path="/ai/workflows" element={<ComingSoon title="Workflows" />} />
-        <Route path="/ai/observability" element={<ComingSoon title="Observability" />} />
-        <Route path="/ai/evaluations" element={<ComingSoon title="Evaluations" />} />
+        <Route path="/ai/observability" element={<Observability />} />
+        <Route path="/ai/evaluations" element={<Evaluations />} />
         <Route path="/ai/security" element={<ComingSoon title="Security Lab" />} />
       </Route>
     </Routes>

@@ -84,6 +84,8 @@ def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
     assert result["plan"]["restaurants"] == [{"name": "Leopold Cafe"}]
     assert result["plan"]["itinerary"] == {"itinerary": [{"day": 1}]}
     assert result["errors"] == []
+    assert [t["step"] for t in result["trace"]] == ["research", "accommodation", "dining", "itinerary"]
+    assert all(t["status"] == "success" for t in result["trace"])
 
 
 def test_plan_trip_collects_errors_without_crashing():
@@ -98,6 +100,9 @@ def test_plan_trip_collects_errors_without_crashing():
     assert result["success"] is True  # the crew itself didn't crash, just one tool errored
     assert result["plan"]["attractions"] == []
     assert "provider down" in result["errors"][0]
+    assert result["trace"][0]["step"] == "research"
+    assert result["trace"][0]["status"] == "error"
+    assert "provider down" in result["trace"][0]["error"]
 
 
 def test_plan_trip_reports_failure_if_crew_kickoff_raises():

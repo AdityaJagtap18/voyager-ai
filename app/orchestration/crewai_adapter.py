@@ -18,6 +18,7 @@ paraphrase it — this matters most for the itinerary step, whose schedule
 comes from real geocoding/distance math, not the LLM; paraphrasing it would
 silently replace real data with a hallucinated summary.
 """
+import time
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -46,6 +47,19 @@ class _TripContext:
     itinerary: Dict = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
     knowledge_context: str = ""
+    trace: List[Dict] = field(default_factory=list)
+
+
+def _trace_entry(step: str, start: float, status: str, error: Optional[str] = None) -> Dict:
+    """Build one observability trace entry (Phase 8) for a CrewAI tool step."""
+    entry = {
+        "step": step,
+        "duration_ms": round((time.monotonic() - start) * 1000, 1),
+        "status": status,
+    }
+    if error:
+        entry["error"] = error
+    return entry
 
 
 class CrewAIOrchestrator:
@@ -81,6 +95,7 @@ class CrewAIOrchestrator:
         @tool("research_attractions", result_as_answer=True)
         def research_attractions() -> str:
             """Find attractions for the trip's destination and trip type."""
+            start = time.monotonic()
             try:
                 ctx.attractions = self.research_agent.find_attractions(
                     destination=ctx.destination,
@@ -88,13 +103,16 @@ class CrewAIOrchestrator:
                     days=ctx.days,
                     knowledge_context=ctx.knowledge_context,
                 )
+                ctx.trace.append(_trace_entry("research", start, "success"))
             except Exception as exc:
                 ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("research", start, "error", str(exc)))
             return f"Found {len(ctx.attractions)} attractions"
 
         @tool("find_accommodations", result_as_answer=True)
         def find_accommodations() -> str:
             """Find accommodations near the attractions already researched."""
+            start = time.monotonic()
             try:
                 ctx.accommodations = self.accommodation_agent.find_accommodations(
                     destination=ctx.destination,
@@ -110,13 +128,16 @@ class CrewAIOrchestrator:
                             best["coordinates"]["lat"],
                             best["coordinates"]["lng"],
                         )
+                ctx.trace.append(_trace_entry("accommodation", start, "success"))
             except Exception as exc:
                 ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("accommodation", start, "error", str(exc)))
             return f"Found {len(ctx.accommodations)} accommodations"
 
         @tool("find_restaurants", result_as_answer=True)
         def find_restaurants() -> str:
             """Find restaurants near the accommodation, honoring dietary preferences."""
+            start = time.monotonic()
             try:
                 ctx.restaurants = self.dining_agent.find_restaurants(
                     destination=ctx.destination,
@@ -126,13 +147,16 @@ class CrewAIOrchestrator:
                     accommodation_location=ctx.best_accommodation_location,
                     attractions=ctx.attractions,
                 )
+                ctx.trace.append(_trace_entry("dining", start, "success"))
             except Exception as exc:
                 ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("dining", start, "error", str(exc)))
             return f"Found {len(ctx.restaurants)} restaurants"
 
         @tool("build_itinerary", result_as_answer=True)
         def build_itinerary() -> str:
             """Build the day-by-day schedule with meals integrated (real geocoding + route optimization)."""
+            start = time.monotonic()
             try:
                 ctx.itinerary = self.itinerary_agent.create_schedule(
                     attractions=ctx.attractions,
@@ -142,8 +166,10 @@ class CrewAIOrchestrator:
                     restaurants=ctx.restaurants,
                     accommodation_location=ctx.best_accommodation_location,
                 )
+                ctx.trace.append(_trace_entry("itinerary", start, "success"))
             except Exception as exc:
                 ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("itinerary", start, "error", str(exc)))
             return "Itinerary built"
 
         llm = self.model or "gpt-3.5-turbo"
@@ -241,4 +267,5 @@ class CrewAIOrchestrator:
                 "accommodations": ctx.accommodations,
             },
             "errors": ctx.errors,
+            "trace": ctx.trace,
         }

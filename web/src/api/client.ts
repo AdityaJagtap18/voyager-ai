@@ -2,6 +2,9 @@ import type {
   AgentInfo,
   Booking,
   BookingCreateRequest,
+  EvaluationRunDetail,
+  EvaluationRunRequest,
+  EvaluationRunSummary,
   FrameworkInfo,
   KnowledgeDocumentCreateRequest,
   KnowledgeDocumentSummary,
@@ -76,4 +79,9 @@ export const api = {
     if (destination) params.set("destination", destination);
     return request<KnowledgeSearchResult[]>(`/api/knowledge/search?${params.toString()}`);
   },
+
+  listEvaluationRuns: () => request<EvaluationRunSummary[]>("/api/evaluations"),
+  getEvaluationRun: (id: string) => request<EvaluationRunDetail>(`/api/evaluations/${id}`),
+  createEvaluationRun: (payload: EvaluationRunRequest) =>
+    request<EvaluationRunDetail>("/api/evaluations", { method: "POST", body: JSON.stringify(payload) }),
 };

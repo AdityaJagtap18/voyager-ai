@@ -339,3 +339,63 @@ def test_create_trip_records_which_model_was_used(monkeypatch):
     assert resp.status_code == 201
     assert resp.json()["model"] == "gpt-4o-mini"
     assert seen_models == ["gpt-4o-mini"]
+
+
+def test_create_trip_persists_trace(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+
+    fake_workflow = MagicMock()
+    fake_workflow.plan_trip.return_value = {
+        "success": True,
+        "plan": {"attractions": [], "itinerary": {}, "restaurants": [], "accommodations": []},
+        "errors": [],
+        "trace": [{"step": "research", "duration_ms": 12.3, "status": "success"}],
+    }
+    monkeypatch.setattr(api_module, "get_workflow", lambda *_: fake_workflow)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["trace"] == [{"step": "research", "duration_ms": 12.3, "status": "success"}]
+
+
+def test_create_evaluation_run_persists_and_returns_results(monkeypatch):
+    fake_results = [
+        {"case_id": "a", "description": "d", "passed": True, "reason": "ok", "duration_ms": 1.0},
+        {"case_id": "b", "description": "d2", "passed": False, "reason": "bad", "duration_ms": 2.0},
+    ]
+    monkeypatch.setattr(api_module, "run_eval_suite", lambda model, framework: fake_results)
+
+    resp = client.post("/api/evaluations", json={})
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["pass_count"] == 1
+    assert body["fail_count"] == 1
+    assert body["results"] == fake_results
+
+    list_resp = client.get("/api/evaluations")
+    assert list_resp.status_code == 200
+    assert len(list_resp.json()) == 1
+
+    get_resp = client.get(f"/api/evaluations/{body['id']}")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["results"] == fake_results
+
+
+def test_get_unknown_evaluation_run_returns_404():
+    resp = client.get("/api/evaluations/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_create_evaluation_run_rejects_unknown_framework():
+    resp = client.post("/api/evaluations", json={"framework": "made-up-framework"})
+    assert resp.status_code == 422
+
+
+def test_list_evaluation_cases():
+    resp = client.get("/api/evaluations/cases/list")
+    assert resp.status_code == 200
+    assert len(resp.json()) > 0

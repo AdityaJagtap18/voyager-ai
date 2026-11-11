@@ -2,6 +2,7 @@
 Multi-Agent Workflow with Integrated Dining
 Orchestrates all agents with dining integrated into itinerary
 """
+import time
 from typing import TypedDict, List, Dict, Tuple, Optional
 from langgraph.graph import StateGraph, END
 
@@ -28,7 +29,20 @@ class TravelPlanState(TypedDict):
     best_accommodation_location: Optional[Tuple[float, float]]
     current_step: str
     errors: List[str]
+    trace: List[Dict]
     complete: bool
+
+
+def _trace_entry(step: str, start: float, status: str, error: Optional[str] = None) -> Dict:
+    """Build one observability trace entry (Phase 8) for a workflow step."""
+    entry = {
+        "step": step,
+        "duration_ms": round((time.monotonic() - start) * 1000, 1),
+        "status": status,
+    }
+    if error:
+        entry["error"] = error
+    return entry
 
 
 class MultiAgentWorkflow:
@@ -67,6 +81,7 @@ class MultiAgentWorkflow:
     def _research_node(self, state: TravelPlanState) -> Dict:
         """Step 1: Find attractions"""
         logger.info("Step 1/4: Research Agent - Finding attractions")
+        start = time.monotonic()
         try:
             attractions = self.research_agent.find_attractions(
                 destination=state["destination"],
@@ -75,14 +90,17 @@ class MultiAgentWorkflow:
                 knowledge_context=state.get("knowledge_context")
             )
             logger.info(f"Research complete: {len(attractions)} attractions found")
-            return {"attractions": attractions, "current_step": "research_complete"}
+            trace_entry = _trace_entry("research", start, "success")
+            return {"attractions": attractions, "current_step": "research_complete", "trace": state.get("trace", []) + [trace_entry]}
         except Exception as e:
             logger.error(f"Research Agent error: {str(e)}")
-            return {"attractions": [], "errors": state.get("errors", []) + [str(e)]}
+            trace_entry = _trace_entry("research", start, "error", str(e))
+            return {"attractions": [], "errors": state.get("errors", []) + [str(e)], "trace": state.get("trace", []) + [trace_entry]}
     
     def _accommodation_node(self, state: TravelPlanState) -> Dict:
         """Step 2: Find accommodations near attractions"""
         logger.info("Step 2/4: Accommodation Agent - Finding hotels near attractions")
+        start = time.monotonic()
         try:
             accommodations = self.accommodation_agent.find_accommodations(
                 destination=state["destination"],
@@ -107,19 +125,22 @@ class MultiAgentWorkflow:
             return {
                 "accommodations": accommodations,
                 "best_accommodation_location": best_accommodation_location,
-                "current_step": "accommodation_complete"
+                "current_step": "accommodation_complete",
+                "trace": state.get("trace", []) + [_trace_entry("accommodation", start, "success")]
             }
         except Exception as e:
             logger.error(f"Accommodation Agent error: {str(e)}")
             return {
                 "accommodations": [],
                 "best_accommodation_location": None,
-                "errors": state.get("errors", []) + [str(e)]
+                "errors": state.get("errors", []) + [str(e)],
+                "trace": state.get("trace", []) + [_trace_entry("accommodation", start, "error", str(e))]
             }
     
     def _dining_node(self, state: TravelPlanState) -> Dict:
         """Step 3: Find restaurants near accommodation and attractions"""
         logger.info("Step 3/4: Dining Agent - Finding restaurants")
+        start = time.monotonic()
         try:
             restaurants = self.dining_agent.find_restaurants(
                 destination=state["destination"],
@@ -130,14 +151,15 @@ class MultiAgentWorkflow:
                 attractions=state["attractions"]
             )
             logger.info(f"Dining complete: {len(restaurants)} restaurants found")
-            return {"restaurants": restaurants, "current_step": "dining_complete"}
+            return {"restaurants": restaurants, "current_step": "dining_complete", "trace": state.get("trace", []) + [_trace_entry("dining", start, "success")]}
         except Exception as e:
             logger.error(f"Dining Agent error: {str(e)}")
-            return {"restaurants": [], "errors": state.get("errors", []) + [str(e)]}
-    
+            return {"restaurants": [], "errors": state.get("errors", []) + [str(e)], "trace": state.get("trace", []) + [_trace_entry("dining", start, "error", str(e))]}
+
     def _itinerary_node(self, state: TravelPlanState) -> Dict:
         """Step 4: Create itinerary with integrated meals"""
         logger.info("Step 4/4: Itinerary Agent - Creating schedule with integrated dining")
+        start = time.monotonic()
         try:
             itinerary = self.itinerary_agent.create_schedule(
                 attractions=state["attractions"],
@@ -148,10 +170,10 @@ class MultiAgentWorkflow:
                 accommodation_location=state.get("best_accommodation_location")
             )
             logger.info("Itinerary complete with integrated meals")
-            return {"itinerary": itinerary, "complete": True, "current_step": "complete"}
+            return {"itinerary": itinerary, "complete": True, "current_step": "complete", "trace": state.get("trace", []) + [_trace_entry("itinerary", start, "success")]}
         except Exception as e:
             logger.error(f"Itinerary Agent error: {str(e)}")
-            return {"itinerary": {}, "errors": state.get("errors", []) + [str(e)]}
+            return {"itinerary": {}, "errors": state.get("errors", []) + [str(e)], "trace": state.get("trace", []) + [_trace_entry("itinerary", start, "error", str(e))]}
     
     def plan_trip(self, destination: str, days: int, trip_type: str, 
                   budget: str = "mid-range", dietary_preferences: List[str] = None) -> Dict:
@@ -180,6 +202,7 @@ class MultiAgentWorkflow:
             "best_accommodation_location": None,
             "current_step": "initialized",
             "errors": [],
+            "trace": [],
             "complete": False
         }
         
@@ -201,7 +224,8 @@ class MultiAgentWorkflow:
                     "restaurants": final_state["restaurants"],
                     "accommodations": final_state["accommodations"]
                 },
-                "errors": final_state["errors"]
+                "errors": final_state["errors"],
+                "trace": final_state["trace"]
             }
         except Exception as e:
             logger.error(f"Workflow failed: {e}")
