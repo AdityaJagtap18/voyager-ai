@@ -23,6 +23,7 @@ export interface TripSummary {
   budget: string;
   status: TripStatus;
   created_at: string;
+  start_date: string | null;
 }
 
 export interface Attraction {
@@ -112,6 +113,7 @@ export interface TripCreateRequest {
   dietary_preferences: string[];
   model?: string;
   framework?: string;
+  start_date?: string;
 }
 
 export interface ModelInfo {

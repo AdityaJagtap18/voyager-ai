@@ -2,6 +2,7 @@
 Accommodation Agent with ORS Integration
 Recommends hotels near main tourist attractions
 """
+from datetime import date, timedelta
 from langchain_core.prompts import ChatPromptTemplate
 from typing import List, Dict, Tuple, Optional
 import json
@@ -9,6 +10,8 @@ import json
 from llm_gateway import get_chat_model
 from utils.logger import logger
 from services.ors_api import geocode, matrix_distances, ORSError
+from services import hotels_api
+from services.hotels_api import HotelsAPIError
 
 
 class AccommodationAgent:
@@ -25,31 +28,43 @@ class AccommodationAgent:
         trip_type: str,
         days: int,
         budget: str = "mid-range",
-        attractions: List[Dict] = None
+        attractions: List[Dict] = None,
+        start_date: Optional[str] = None
     ) -> List[Dict]:
         """
         Find accommodation recommendations near main attractions
-        
+
         Args:
             destination: City/location
             trip_type: Type of trip
             days: Number of days
             budget: Budget level
             attractions: List of attractions with coordinates
-            
+            start_date: Optional "YYYY-MM-DD" check-in date (Phase 3 fusion).
+                When set and the real hotels provider (RAPIDAPI_KEY) is
+                configured, recommendations are grounded in real, live hotel
+                listings instead of LLM-generated ones. Without it (or if the
+                real lookup finds nothing), falls back to the original
+                LLM-generated flow — never silently returns nothing just
+                because a date wasn't given.
+
         Returns:
             List of accommodation recommendations with distances to attractions
         """
         logger.info(f"Finding accommodations in {destination}")
-        
-        # Get accommodation recommendations from LLM
-        accommodations = self._get_accommodation_recommendations(
-            destination, trip_type, days, budget
-        )
-        
-        # Geocode accommodations
-        accommodations = self._geocode_accommodations(accommodations, destination)
-        
+
+        accommodations = None
+        if start_date:
+            accommodations = self._get_real_hotels(destination, start_date, days)
+
+        if accommodations is None:
+            # Get accommodation recommendations from LLM
+            accommodations = self._get_accommodation_recommendations(
+                destination, trip_type, days, budget
+            )
+            # Geocode accommodations
+            accommodations = self._geocode_accommodations(accommodations, destination)
+
         # If attractions provided, calculate average distance to attractions
         if attractions and any(a.get('coordinates') for a in attractions):
             accommodations = self._calculate_attraction_proximity(
@@ -134,14 +149,83 @@ class AccommodationAgent:
             
             accommodations_text = accommodations_text.strip()
             accommodations = json.loads(accommodations_text)
-            
+            for accommodation in accommodations:
+                accommodation["source"] = "llm"
+
             logger.info(f"Got {len(accommodations)} accommodation recommendations")
             return accommodations
-            
+
         except Exception as e:
             logger.error(f"Error getting accommodations: {e}")
             return []
-    
+
+    def _get_real_hotels(self, destination: str, start_date: str, days: int) -> Optional[List[Dict]]:
+        """
+        Real, live hotel listings (Phase 3 fusion) via services/hotels_api.py
+        (Booking.com), in the same dict shape _get_accommodation_recommendations()
+        produces so downstream proximity scoring works unchanged either way.
+
+        Returns None (not []) when real data isn't usable for any reason —
+        provider unconfigured, destination unresolvable, no offers found, or a
+        provider error — so the caller falls back to the LLM-generated flow
+        instead of a trip silently ending up with zero accommodations.
+        """
+        if not hotels_api.is_configured():
+            return None
+
+        try:
+            checkin = date.fromisoformat(start_date)
+            checkout = checkin + timedelta(days=days)
+
+            destinations = hotels_api.search_destination(destination)
+            if not destinations:
+                logger.warning(f"Real hotels: no destination match for '{destination}', falling back to LLM")
+                return None
+            dest = destinations[0]
+
+            offers = hotels_api.search_hotels(
+                dest["dest_id"], dest["search_type"], checkin.isoformat(), checkout.isoformat()
+            )
+            if not offers:
+                logger.warning(f"Real hotels: no offers for '{destination}', falling back to LLM")
+                return None
+
+            accommodations = []
+            for offer in offers[:5]:
+                coordinates = None
+                if offer.get("latitude") is not None and offer.get("longitude") is not None:
+                    coordinates = {"lat": offer["latitude"], "lng": offer["longitude"]}
+
+                rating = f"{offer['review_score']}/10" if offer.get("review_score") is not None else "N/A"
+                stars = f"{offer['star_rating']}★" if offer.get("star_rating") else None
+
+                accommodations.append({
+                    "name": offer.get("name") or "Unnamed property",
+                    "type": "hotel",
+                    "location": destination,
+                    "neighborhood": destination,
+                    "price_per_night": offer.get("price_formatted") or (
+                        f"{offer['price_raw']} {offer['currency']}" if offer.get("price_raw") is not None else "N/A"
+                    ),
+                    "rating": rating,
+                    "amenities": [],
+                    "best_for": "all travelers",
+                    "vibe": offer.get("review_score_word") or "N/A",
+                    "proximity_to_center": "N/A",
+                    "highlights": [stars] if stars else [],
+                    "booking_tip": "Live pricing and availability from Booking.com — prices can change, book promptly.",
+                    "description": f"Real-time Booking.com listing, rated {offer.get('review_score_word') or 'N/A'} "
+                                    f"({rating}).",
+                    "coordinates": coordinates,
+                    "source": "real",
+                })
+
+            logger.info(f"Got {len(accommodations)} real hotel listings for {destination}")
+            return accommodations
+        except (HotelsAPIError, ValueError, KeyError) as e:
+            logger.warning(f"Real hotels lookup failed, falling back to LLM: {e}")
+            return None
+
     def _geocode_accommodations(self, accommodations: List[Dict], destination: str) -> List[Dict]:
         """Add coordinates to accommodations"""
         logger.info("Geocoding accommodations")

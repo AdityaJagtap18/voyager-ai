@@ -21,6 +21,7 @@ class TravelPlanState(TypedDict):
     trip_type: str
     budget: str
     dietary_preferences: List[str]
+    start_date: Optional[str]
     knowledge_context: str
     attractions: List[Dict]
     itinerary: Dict
@@ -107,7 +108,8 @@ class MultiAgentWorkflow:
                 trip_type=state["trip_type"],
                 days=state["days"],
                 budget=state.get("budget", "mid-range"),
-                attractions=state["attractions"]
+                attractions=state["attractions"],
+                start_date=state.get("start_date")
             )
             
             # Get best accommodation location
@@ -175,13 +177,14 @@ class MultiAgentWorkflow:
             logger.error(f"Itinerary Agent error: {str(e)}")
             return {"itinerary": {}, "errors": state.get("errors", []) + [str(e)], "trace": state.get("trace", []) + [_trace_entry("itinerary", start, "error", str(e))]}
     
-    def plan_trip(self, destination: str, days: int, trip_type: str, 
-                  budget: str = "mid-range", dietary_preferences: List[str] = None) -> Dict:
+    def plan_trip(self, destination: str, days: int, trip_type: str,
+                  budget: str = "mid-range", dietary_preferences: List[str] = None,
+                  start_date: Optional[str] = None) -> Dict:
         """Execute the complete multi-agent workflow"""
         logger.info("=" * 60)
         logger.info("Starting Multi-Agent Travel Planning with Integrated Dining")
         logger.info("=" * 60)
-        
+
         try:
             knowledge_context = get_context_for_destination(destination)
         except Exception as e:
@@ -194,6 +197,7 @@ class MultiAgentWorkflow:
             "trip_type": trip_type,
             "budget": budget,
             "dietary_preferences": dietary_preferences or [],
+            "start_date": start_date,
             "knowledge_context": knowledge_context,
             "attractions": [],
             "itinerary": {},

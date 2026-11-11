@@ -55,6 +55,28 @@ def test_plan_trip_trace_covers_all_four_steps_in_order():
     assert all(isinstance(t["duration_ms"], float) for t in result["trace"])
 
 
+def test_plan_trip_passes_start_date_through_to_accommodation_agent():
+    workflow, mocks = _build_workflow_with_mocked_agents()
+
+    with patch("workflow.get_context_for_destination", return_value=""):
+        workflow.plan_trip(
+            destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10"
+        )
+
+    _, kwargs = mocks["accommodation"].find_accommodations.call_args
+    assert kwargs["start_date"] == "2026-12-10"
+
+
+def test_plan_trip_defaults_start_date_to_none():
+    workflow, mocks = _build_workflow_with_mocked_agents()
+
+    with patch("workflow.get_context_for_destination", return_value=""):
+        workflow.plan_trip(destination="Goa, India", days=5, trip_type="relaxation")
+
+    _, kwargs = mocks["accommodation"].find_accommodations.call_args
+    assert kwargs["start_date"] is None
+
+
 def test_plan_trip_trace_records_error_status_for_failing_step():
     workflow, mocks = _build_workflow_with_mocked_agents()
     mocks["dining"].find_restaurants.side_effect = RuntimeError("provider down")

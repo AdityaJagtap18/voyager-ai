@@ -27,6 +27,12 @@ class Trip(Base):
     budget = Column(String(50), nullable=False, default="mid-range")
     dietary_preferences = Column(JSON, nullable=False, default=list)
 
+    # Phase 3 (planner fusion): optional "YYYY-MM-DD" check-in date. Only used
+    # to query real hotel availability/pricing (app/services/hotels_api.py) for
+    # the accommodation agent — trips can still be planned without one, same
+    # as before, just without real-data grounding (see accommodation_agent.py).
+    start_date = Column(String(10), nullable=True)
+
     status = Column(String(20), nullable=False, default="planning")  # planning | complete | failed
     plan = Column(JSON, nullable=True)  # {attractions, itinerary, restaurants, accommodations}
     errors = Column(JSON, nullable=False, default=list)

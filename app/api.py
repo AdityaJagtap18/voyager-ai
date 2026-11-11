@@ -12,6 +12,7 @@ import os
 import secrets
 import sys
 from contextlib import asynccontextmanager
+from datetime import date
 from typing import Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
@@ -259,6 +260,11 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail=f"trip_type must be one of {TRIP_TYPES}")
     if payload.budget.lower() not in BUDGET_LEVELS:
         raise HTTPException(status_code=422, detail=f"budget must be one of {BUDGET_LEVELS}")
+    if payload.start_date:
+        try:
+            date.fromisoformat(payload.start_date)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="start_date must be in YYYY-MM-DD format")
     if payload.model and payload.model not in MODEL_REGISTRY:
         raise HTTPException(status_code=422, detail=f"model must be one of {list(MODEL_REGISTRY)}")
     if payload.framework and payload.framework not in FRAMEWORK_REGISTRY:
@@ -295,6 +301,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         model=model_id,
         framework=framework_id,
         status="planning",
+        start_date=payload.start_date,
     )
     db.add(trip)
     db.commit()
@@ -308,6 +315,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
             trip_type=trip.trip_type,
             budget=trip.budget,
             dietary_preferences=trip.dietary_preferences,
+            start_date=trip.start_date,
         )
     except Exception as exc:  # workflow-level failure (e.g. provider outage)
         trip.status = "failed"

@@ -9,6 +9,7 @@ export default function PlanTrip() {
   const [days, setDays] = useState(3);
   const [tripType, setTripType] = useState<string>(TRIP_TYPES[0]);
   const [budget, setBudget] = useState<string>("mid-range");
+  const [startDate, setStartDate] = useState("");
   const [dietary, setDietary] = useState("");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState<string>("");
@@ -44,6 +45,7 @@ export default function PlanTrip() {
           .filter(Boolean),
         model: model || undefined,
         framework: framework || undefined,
+        start_date: startDate || undefined,
       });
       navigate(`/trips/${trip.id}`);
     } catch (e) {
@@ -101,6 +103,20 @@ export default function PlanTrip() {
             </select>
           </label>
         </div>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Start date{" "}
+          <span className="font-normal text-ink-500">
+            (optional — when set, accommodation suggestions use real, live hotel pricing instead of AI-generated
+            ones)
+          </span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="rounded-lg border border-ink-900/10 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          />
+        </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
           Trip type

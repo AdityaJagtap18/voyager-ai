@@ -88,6 +88,20 @@ def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
     assert all(t["status"] == "success" for t in result["trace"])
 
 
+def test_plan_trip_passes_start_date_through_to_accommodation_agent():
+    orchestrator, mocks = _build_orchestrator_with_mocked_agents()
+
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ):
+        orchestrator.plan_trip(
+            destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10"
+        )
+
+    _, kwargs = mocks["accommodation"].find_accommodations.call_args
+    assert kwargs["start_date"] == "2026-12-10"
+
+
 def test_plan_trip_collects_errors_without_crashing():
     orchestrator, mocks = _build_orchestrator_with_mocked_agents()
     mocks["research"].find_attractions.side_effect = RuntimeError("provider down")

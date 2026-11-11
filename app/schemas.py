@@ -19,6 +19,12 @@ class TripCreateRequest(BaseModel):
     dietary_preferences: List[str] = Field(default_factory=list)
     model: Optional[str] = Field(None, description="Model id from GET /api/models; omit for the configured default")
     framework: Optional[str] = Field(None, description="Orchestration framework id from GET /api/frameworks; omit for the default (langgraph)")
+    start_date: Optional[str] = Field(
+        None,
+        examples=["2026-12-10"],
+        description="Optional check-in date (YYYY-MM-DD). When set and RAPIDAPI_KEY is configured, the "
+        "accommodation agent grounds its recommendations in real, live hotel data instead of LLM-generated ones.",
+    )
 
 
 class TripSummary(BaseModel):
@@ -29,6 +35,7 @@ class TripSummary(BaseModel):
     budget: str
     status: str
     created_at: datetime
+    start_date: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

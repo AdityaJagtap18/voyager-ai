@@ -60,6 +60,42 @@ def test_create_trip_requires_valid_trip_type(monkeypatch):
     assert resp.status_code == 422
 
 
+def test_create_trip_rejects_malformed_start_date(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "budget": "mid-range",
+        "start_date": "10th December",
+    })
+    assert resp.status_code == 422
+
+
+def test_create_trip_passes_start_date_through_to_workflow(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+
+    fake_workflow = MagicMock()
+    fake_workflow.plan_trip.return_value = {
+        "success": True,
+        "plan": {"attractions": [], "itinerary": {}, "restaurants": [], "accommodations": []},
+        "errors": [],
+    }
+    monkeypatch.setattr(api_module, "get_workflow", lambda *_: fake_workflow)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "budget": "mid-range",
+        "start_date": "2026-12-10",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["start_date"] == "2026-12-10"
+    _, kwargs = fake_workflow.plan_trip.call_args
+    assert kwargs["start_date"] == "2026-12-10"
+
+
 def test_create_trip_fails_without_openai_key(monkeypatch):
     monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", None)
     resp = client.post("/api/trips", json={

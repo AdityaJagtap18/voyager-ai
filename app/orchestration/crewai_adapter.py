@@ -40,6 +40,7 @@ class _TripContext:
     trip_type: str
     budget: str
     dietary_preferences: List[str]
+    start_date: Optional[str] = None
     attractions: List[Dict] = field(default_factory=list)
     accommodations: List[Dict] = field(default_factory=list)
     best_accommodation_location: Optional[Tuple[float, float]] = None
@@ -79,6 +80,7 @@ class CrewAIOrchestrator:
         trip_type: str,
         budget: str = "mid-range",
         dietary_preferences: Optional[List[str]] = None,
+        start_date: Optional[str] = None,
     ) -> Dict:
         ctx = _TripContext(
             destination=destination,
@@ -86,6 +88,7 @@ class CrewAIOrchestrator:
             trip_type=trip_type,
             budget=budget,
             dietary_preferences=dietary_preferences or [],
+            start_date=start_date,
         )
         try:
             ctx.knowledge_context = get_context_for_destination(destination)
@@ -120,6 +123,7 @@ class CrewAIOrchestrator:
                     days=ctx.days,
                     budget=ctx.budget,
                     attractions=ctx.attractions,
+                    start_date=ctx.start_date,
                 )
                 if ctx.accommodations:
                     best = self.accommodation_agent.get_best_accommodation(ctx.accommodations)
