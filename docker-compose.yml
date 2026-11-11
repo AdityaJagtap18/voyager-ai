@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  voyager-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voyager-ai
+    ports:
+      - "8501:8501"
+    environment:
+      # OpenAI Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
+      - OPENAI_TEMPERATURE=${OPENAI_TEMPERATURE:-0.7}
+
+      # OpenRouteService Configuration
+      - ORS_API_KEY=${ORS_API_KEY}
+
+      # Optional Agent Settings
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-300}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+    volumes:
+      # Mount data directory to persist itineraries
+      - ./data:/app/data
+
+      # Optional: Mount .env file for development
+      # - ./.env:/app/.env:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - voyager-network
+
+networks:
+  voyager-network:
+    driver: bridge

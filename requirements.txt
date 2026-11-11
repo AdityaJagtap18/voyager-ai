@@ -1,0 +1,48 @@
+# ==========================================
+# Core AI & LLM
+# ==========================================
+langchain
+langchain-core
+langgraph
+langchain-openai
+langchain-community
+openai
+
+# ==========================================
+# API Framework (for later)
+# ==========================================
+fastapi
+uvicorn[standard]
+
+# ==========================================
+# Configuration & Environment
+# ==========================================
+python-dotenv
+pydantic
+pydantic-settings
+
+# ==========================================
+# HTTP Clients (for APIs later)
+# ==========================================
+httpx
+requests
+googlemaps
+
+# ==========================================
+# Utilities
+# ==========================================
+python-dateutil
+tenacity
+
+# ==========================================
+# Frontend
+# ==========================================
+streamlit
+
+# ==========================================
+# Development & Testing
+# ==========================================
+pytest
+pytest-asyncio
+black
+flake8

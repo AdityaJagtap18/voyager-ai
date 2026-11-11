@@ -1,0 +1,1376 @@
+# VOYAGER AI
+# MASTER PRODUCT BLUEPRINT, ARCHITECTURE & BROWNFIELD TRANSFORMATION PROMPT
+
+**Role:** Principal Software Architect, Senior Full-Stack Engineer, AI Engineer, Product Designer, DevSecOps Engineer and Technical Lead.
+
+**Project:** Voyager AI
+
+**Transformation:** Existing brownfield travel-planning application into a complete AI-powered travel platform and AI engineering playground.
+
+**Primary deliverable:** One comprehensive master architecture and implementation document.
+
+**Implementation approach:** Incremental, phase-gated brownfield transformation.
+
+---
+
+# 1. YOUR MISSION
+
+Transform the existing Voyager AI repository into a complete, open-source-first AI-powered travel planning application and AI engineering playground.
+
+This is an existing brownfield project.
+
+You MUST inspect, understand, preserve and extend the existing codebase.
+
+You are NOT building an unrelated application from scratch.
+
+Your responsibilities:
+
+1. Audit the entire repository.
+2. Understand the existing travel-planning implementation.
+3. Identify reusable code, working functionality and technical debt.
+4. Inspect existing UI components, SVG assets and design resources.
+5. Design the target architecture.
+6. Create one definitive master reference document.
+7. Use that document as the implementation contract.
+8. Transform the existing application incrementally.
+9. Test every implementation phase.
+10. Deliver a functional, documented and reproducible project.
+
+Do not start major architectural modifications before completing the repository audit.
+
+# 2. PRODUCT VISION
+
+## 2.1 Product identity
+
+**Voyager AI — An Open-Source AI-Powered Travel Planning and AI Engineering Platform.**
+
+Voyager solves a real-world problem: helping people research, plan, optimize, manage and book trips.
+
+Users should be able to:
+
+- Describe a trip using natural language.
+- Discover destinations and attractions.
+- Search real flights and hotels.
+- Compare available prices.
+- Check weather.
+- Discover restaurants and activities.
+- Generate realistic itineraries.
+- Optimize routes and schedules.
+- Manage budgets and expenses.
+- Collaborate with other travellers.
+- Manage bookings and travel documents.
+- Replan when circumstances change.
+- Complete bookings through authorized providers or booking handoffs.
+
+Voyager also demonstrates modern AI engineering technologies through the actual travel-planning use case.
+
+## 2.2 Two connected product dimensions
+
+**Travel Workspace:** The actual travel application and primary user experience.
+
+**AI Engineering Workspace:** A configurable environment for experimenting with models, agent frameworks, RAG, MCP, observability, evaluation, guardrails and other AI technologies.
+
+These must not become disconnected demonstrations.
+
+For example, a developer should be able to generate the same travel itinerary using LangGraph and CrewAI, using Ollama and OpenAI, and compare quality, latency, token usage, cost and execution traces.
+
+## 2.3 Product principles
+
+- Open-source-first.
+- Local-first wherever practical.
+- No mandatory paid API dependencies.
+- Optional commercial AI providers.
+- Preserve existing working functionality.
+- Real integrations wherever access permits.
+- Provider-independent architecture.
+- Configurable and comparable integrations.
+- Reproducible experiments.
+- Transparent data sources.
+- Explicit approval for financial actions.
+- Strong security boundaries.
+- Finite implementation phases.
+
+This is a technically sophisticated portfolio and demonstration project, not an enterprise SaaS product.
+
+Do not over-engineer it for imaginary enterprise scale.
+
+---
+
+# 3. BROWNFIELD REPOSITORY AUDIT
+
+## 3.1 Inspect the entire repository
+
+Before modifying code, inspect:
+
+- Directory structure.
+- Backend implementation.
+- Frontend implementation.
+- Existing agents.
+- LangGraph workflows.
+- Provider integrations.
+- API endpoints.
+- Database and persistence.
+- Environment configuration.
+- Authentication and authorization.
+- Existing UI components.
+- SVG folder and its contents.
+- Design resources.
+- Existing images and illustrations.
+- Tests.
+- Docker configuration.
+- CI/CD.
+- Dependencies.
+- Documentation.
+- Git history.
+- Current branch.
+- Uncommitted changes.
+
+Read the existing Voyager PRD and relevant documentation.
+
+Do not assume that the repository exactly matches an earlier PRD.
+
+The actual repository is authoritative about the current implementation.
+
+## 3.2 Mandatory inspection of the existing SVG folder
+
+The repository already contains an `svg/` folder with existing UI components.
+
+This folder is an important existing project asset.
+
+You MUST inspect it completely before designing or implementing new frontend components.
+
+Do not ignore it, replace it or create duplicate components without justification.
+
+Perform the following:
+
+1. Locate the existing `svg/` folder.
+2. Inspect its complete directory structure.
+3. Identify all SVG files and SVG-based components.
+4. Identify whether files are standalone illustrations, icons, logos, reusable components or complete UI elements.
+5. Inspect their visual appearance.
+6. Identify how they are currently imported and used.
+7. Identify their dependencies and expected props.
+8. Identify whether they contain animations, gradients, masks, filters or other SVG features.
+9. Identify their dimensions, viewBox and scaling behaviour.
+10. Document their intended use and compatibility with the target UI.
+
+Create an SVG and UI asset inventory in the master blueprint.
+
+Use a table:
+
+| Asset/component | Existing location | Type | Current usage | Reusability | Required action |
+|---|---|---|---|---|---|
+| Asset name | Path | Icon/illustration/component | Existing screen | High/medium/low | Preserve/extend/refactor |
+
+### SVG preservation and reuse rules
+
+- Reuse existing SVG assets wherever appropriate.
+- Preserve existing visual identity.
+- Do not unnecessarily recreate existing illustrations.
+- Do not replace existing SVG components with generic icon-library alternatives.
+- Do not introduce duplicate SVG assets.
+- Do not modify SVG paths or visual properties unless required.
+- Preserve existing component interfaces where practical.
+- Refactor only when there is a clear technical or design requirement.
+- Make reusable SVG components responsive.
+- Preserve accessible labels and meaningful descriptions.
+- Ensure SVGs render correctly in the light theme.
+- Verify SVG rendering at different screen sizes.
+
+If the existing SVG folder contains complete UI components rather than just icons, inspect and reuse those components as actual frontend building blocks.
+
+The folder must be treated as an existing design asset library.
+
+If an SVG asset is unsuitable for the new design, document why before replacing it.
+
+## 3.3 Existing module classification
+
+Create a repository inventory.
+
+Classify each major component:
+
+- PRESERVE.
+- EXTEND.
+- REFACTOR.
+- REPLACE.
+- REMOVE.
+
+Document:
+
+| Attribute | Description |
+|---|---|
+| Module | File or component |
+| Responsibility | Current purpose |
+| Current status | Working, partial, broken, unused |
+| Dependencies | Connected components |
+| Reusability | Whether it can be retained |
+| Required modification | What must change |
+| Migration risk | Low, medium, high |
+| Decision | Preserve, extend, refactor, replace or remove |
+
+REPLACE and REMOVE require explicit technical justification.
+
+## 3.4 Preserve the original travel engine
+
+The existing travel-planning workflow is the foundation.
+
+If the existing LangGraph implementation is present and working, preserve it.
+
+Retain useful existing logic for:
+
+- Destination research.
+- Accommodation recommendations.
+- Dining recommendations.
+- Itinerary generation.
+- Geographic validation.
+- Distance calculations.
+- Route optimization.
+- Scheduling.
+- Provider access.
+
+Introduce framework adapters around the existing implementation rather than rewriting it unnecessarily.
+
+## 3.5 Existing PRD reconciliation
+
+Read the original Voyager AI PRD.
+
+Retain useful requirements, architectural decisions, security controls and testing requirements.
+
+Expand the scope to include:
+
+- Real flight and hotel search.
+- Travel provider integrations.
+- Booking handoff.
+- Future authorized direct booking.
+- AI engineering workspace.
+- Configurable model providers.
+- Agent framework comparisons.
+- RAG and MCP.
+- Observability and evaluation.
+- Guardrails and security experimentation.
+
+Document conflicts between the old PRD and the new direction.
+
+Do not silently remove original requirements.
+
+---
+
+# 4. SINGLE MASTER REFERENCE DOCUMENT
+
+Create exactly one primary specification:
+
+`docs/VOYAGER_MASTER_BLUEPRINT.md`
+
+This document is the authoritative reference for the entire project.
+
+Do not create competing PRDs or architecture documents.
+
+It must be detailed enough that another developer or coding agent can implement the project without repeatedly asking for architectural decisions.
+
+Include:
+
+1. Executive summary.
+2. Product scope.
+3. Functional requirements with stable IDs.
+4. User stories and acceptance criteria.
+5. Complete user journeys.
+6. Technology selection matrix.
+7. System architecture.
+8. Backend architecture.
+9. Frontend architecture.
+10. Database schema and ER diagram.
+11. API contracts and OpenAPI.
+12. Integration architecture.
+13. Model gateway and routing.
+14. Agent framework architecture.
+15. RAG and MCP architecture.
+16. Observability architecture.
+17. Evaluation architecture.
+18. Security and authorization.
+19. Travel provider integrations.
+20. Booking and financial safety.
+21. UI/UX design system.
+22. SVG and existing UI asset inventory.
+23. Deployment architecture.
+24. Testing strategy.
+25. Risks and architecture decisions.
+26. Phase-gated roadmap.
+27. Definition of done.
+
+Use Mermaid diagrams for architecture, data flows, sequence diagrams and workflows.
+
+For every major requirement, specify:
+
+- Requirement ID.
+- Description.
+- User story.
+- Priority.
+- Dependencies.
+- Expected behaviour.
+- Acceptance criteria.
+- Testing requirements.
+
+---
+
+# 5. COMPLETE TRAVEL WORKSPACE
+
+The travel application is the primary product.
+
+Implement all of the following.
+
+## 5.1 Intelligent itinerary planning
+
+- Natural-language trip requests.
+- Destination and date selection.
+- Traveller count.
+- Budget.
+- Preferences and interests.
+- Dietary requirements.
+- Accessibility requirements.
+- Personalized itinerary generation.
+- Multi-day scheduling.
+- Multiple destinations.
+- Geographic optimization.
+- Estimated travel time.
+- Activity duration.
+- Opening hours.
+- Meal scheduling.
+- User editing.
+- Version history.
+- Export and sharing.
+
+## 5.2 Real flight search
+
+Evaluate and integrate:
+
+- Amadeus.
+- Skyscanner, subject to partner approval.
+
+Support:
+
+- Origin and destination.
+- Departure and return dates.
+- Passenger count.
+- Cabin class.
+- Airlines.
+- Stops.
+- Flight timings.
+- Fare comparison.
+- Baggage information where available.
+- Price freshness.
+- Booking links.
+- Future authorized direct booking.
+
+## 5.3 Real hotel search
+
+Evaluate:
+
+- Amadeus.
+- Booking.com Demand API, subject to partner access.
+
+Support:
+
+- Location.
+- Check-in and check-out.
+- Guests and rooms.
+- Availability.
+- Pricing.
+- Amenities.
+- Cancellation policies.
+- Provider details.
+- Booking handoff.
+- Future authorized direct booking.
+
+## 5.4 Restaurants and activities
+
+Support discovery of:
+
+- Restaurants.
+- Attractions.
+- Museums.
+- Events.
+- Local experiences.
+- Adventure activities.
+- Shopping.
+- Tourist destinations.
+
+Use suitable real-world providers.
+
+## 5.5 Weather-aware planning
+
+Use Open-Meteo or an appropriate provider.
+
+Support:
+
+- Daily forecasts.
+- Hourly forecasts where available.
+- Temperature.
+- Rain probability.
+- Wind.
+- Warnings.
+- Outdoor activity suitability.
+- Weather-based alternatives.
+
+## 5.6 Maps and routing
+
+Evaluate:
+
+- OpenStreetMap.
+- OSRM.
+- openrouteservice.
+
+Support:
+
+- Interactive maps.
+- Geocoding.
+- Directions.
+- Distance.
+- Estimated journey times.
+- Multi-stop routing.
+- Geographic grouping.
+- Route optimization.
+
+Respect provider quotas and attribution requirements.
+
+## 5.7 Budget and expenses
+
+- Overall budget.
+- Flight expenses.
+- Accommodation.
+- Food.
+- Transport.
+- Activities.
+- Shopping.
+- Miscellaneous spending.
+- Planned versus actual expenses.
+- Currency conversion.
+- Per-person spending.
+- Expense splitting.
+- Budget alerts.
+- Cheaper alternatives.
+
+## 5.8 Group travel
+
+- Invite travellers.
+- Shared itineraries.
+- Voting.
+- Shared budgets.
+- Expense splitting.
+- Comments.
+- Change history.
+- Permissions.
+
+## 5.9 Booking wallet
+
+- Flight references.
+- Hotel confirmations.
+- Tickets.
+- Receipts.
+- Travel documents.
+- Booking links.
+- Confirmation status.
+- Trip timeline.
+
+## 5.10 Travel readiness
+
+- Visa and entry requirements.
+- Passport reminders.
+- Official travel advisories.
+- Insurance information.
+- Local laws.
+- Document checklist.
+- Packing checklist.
+- Emergency contacts.
+
+Use official sources for legal and entry requirements.
+
+## 5.11 Dynamic replanning
+
+Account for:
+
+- Weather changes.
+- Flight delays.
+- Cancellations.
+- Activity availability.
+- Opening-hour changes.
+- Budget overruns.
+- Schedule conflicts.
+
+Identify affected itinerary items and recommend alternatives.
+
+Do not modify confirmed bookings without approval.
+
+## 5.12 Offline travel companion
+
+Allow users to download itineraries, important addresses, booking references, documents, emergency contacts and permitted map data.
+
+Synchronize when connectivity returns.
+
+## 5.13 Voice and image discovery
+
+- Voice-based travel assistant.
+- Speech-to-text.
+- Text-to-speech.
+- Image-based destination discovery.
+- Landmark recognition.
+- Similar-place recommendations.
+- Multimodal trip planning.
+
+## 5.14 Multi-agent travel intelligence
+
+Potential agents:
+
+- Coordinator.
+- Research.
+- Flight.
+- Accommodation.
+- Dining.
+- Weather.
+- Budget.
+- Itinerary.
+- Booking.
+- Travel Readiness.
+
+Implement multi-agent collaboration, debate and recommendation evaluation where useful.
+
+Agents must have limited permissions.
+
+---
+
+# 6. AI ENGINEERING WORKSPACE
+
+## 6.1 Models and routing
+
+Support:
+
+- Ollama.
+- vLLM.
+- OpenAI.
+- Anthropic.
+- Google Gemini.
+- Hugging Face.
+- OpenAI-compatible APIs.
+
+Evaluate LiteLLM as the primary gateway.
+
+Implement model registry, provider configuration, credentials, model capabilities, context limits, pricing, timeouts, retries, health checks, routing, fallbacks and usage tracking.
+
+All model requests must follow the common gateway or an equivalent documented policy-enforcing adapter.
+
+## 6.2 Agent framework ecosystem
+
+Preserve LangGraph.
+
+Support adapters for:
+
+- LangGraph.
+- LangChain.
+- CrewAI.
+- AutoGen where justified.
+
+Allow the same travel task to run on different frameworks.
+
+Implement:
+
+- Agent creation.
+- Instructions.
+- Model assignment.
+- Tool assignment.
+- Memory.
+- Guardrails.
+- Execution limits.
+- Testing.
+- Execution history.
+- Cancellation.
+- Framework comparisons.
+
+## 6.3 Agent Studio
+
+Create agents, configure instructions, models, tools, memory and guardrails, run tests and inspect results.
+
+Provide reusable travel-agent templates.
+
+## 6.4 Workflow Studio
+
+Provide a visual workflow builder with:
+
+- Agent nodes.
+- LLM nodes.
+- Tool nodes.
+- MCP nodes.
+- RAG nodes.
+- Conditional branching.
+- Parallel execution.
+- Human approval.
+- Output validation.
+
+Support saved and versioned workflows.
+
+## 6.5 RAG Lab
+
+Support:
+
+- Document ingestion.
+- PDF parsing.
+- Chunking.
+- Embeddings.
+- Vector databases.
+- Hybrid retrieval.
+- Reranking.
+- Metadata filtering.
+- Citations.
+- Retrieval evaluation.
+
+Evaluate Qdrant, Chroma, Milvus and pgvector.
+
+## 6.6 MCP
+
+Implement:
+
+- MCP client.
+- MCP server.
+- Server registration.
+- Tool discovery.
+- Authentication.
+- Authorization.
+- Execution.
+- Result validation.
+- Error handling.
+
+## 6.7 Prompt Studio
+
+- Prompt creation.
+- Versioning.
+- Templates.
+- Variables.
+- Testing.
+- Comparisons.
+- Execution history.
+- Evaluation.
+- Adversarial tests.
+
+## 6.8 Observability
+
+Support:
+
+- Langfuse.
+- LangSmith.
+- Arize Phoenix.
+- OpenTelemetry.
+- Prometheus.
+- Grafana.
+- Loki.
+- Jaeger.
+- Helicone.
+- MLflow.
+
+Explain their distinct purposes.
+
+Allow compatible integrations to work together through a common telemetry layer.
+
+Redact sensitive information before export.
+
+## 6.9 Evaluation
+
+Support:
+
+- DeepEval.
+- Ragas.
+- Custom evaluators.
+- Dataset creation.
+- Regression testing.
+- Model comparisons.
+- Framework comparisons.
+- Prompt comparisons.
+- Retrieval comparisons.
+
+Travel metrics include geographic correctness, budget adherence, schedule feasibility, preference adherence, groundedness and completeness.
+
+## 6.10 Tokenomics
+
+Track token usage, provider, model, cost, latency, retries, agent usage and workflow usage.
+
+## 6.11 Fine-tuning
+
+Demonstrate dataset preparation, LoRA, QLoRA, training configuration, evaluation and before/after comparisons.
+
+---
+
+# 7. INTEGRATION MARKETPLACE
+
+Create a central Integration Registry.
+
+Every integration must define:
+
+- ID.
+- Name.
+- Category.
+- Description.
+- Capabilities.
+- License.
+- Deployment mode.
+- Configuration schema.
+- Credentials.
+- Health check.
+- Adapter.
+- Compatibility.
+- Documentation.
+- Cost.
+- Connection state.
+- Active state.
+- Health state.
+
+Statuses:
+
+- NOT CONFIGURED.
+- CONFIGURED.
+- CONNECTED.
+- ACTIVE.
+- DEGRADED.
+- DISABLED.
+- ERROR.
+
+Build:
+
+1. Marketplace.
+2. My Integrations.
+3. Comparison.
+4. Compatibility.
+5. Usage and Health.
+
+Users must be able to discover, compare, configure, test and combine integrations.
+
+Explain when technologies complement one another rather than treating every product as a competitor.
+
+---
+
+# 8. SECURITY AND GUARDRAILS
+
+Implement four mandatory checkpoints:
+
+1. Input screening.
+2. Tool-call authorization.
+3. Tool-result screening.
+4. Output screening.
+
+Cover:
+
+- Direct and indirect prompt injection.
+- System prompt extraction.
+- Secret leakage.
+- PII.
+- Data exfiltration.
+- Malicious documents.
+- RAG injection.
+- Web-result injection.
+- MCP injection.
+- Cross-agent injection.
+- Encoded and Unicode attacks.
+- Multi-turn attacks.
+- Tool abuse.
+
+Evaluate NeMo Guardrails, Guardrails AI, Presidio, Llama Guard, Pydantic, Semgrep, pytest, Hypothesis and garak.
+
+Authorization must be enforced independently of model decisions.
+
+Fail closed if a security check fails, times out or returns an ambiguous result.
+
+Require human approval for bookings, payments and destructive actions.
+
+Build an interactive Security Lab with reproducible adversarial tests.
+
+---
+
+# 9. REAL-WORLD TRAVEL PROVIDERS
+
+Create a separate Travel Provider Hub.
+
+Evaluate:
+
+**Flights:** Amadeus, Skyscanner.
+
+**Hotels:** Amadeus, Booking.com Demand API.
+
+**Weather:** Open-Meteo.
+
+**Maps:** OpenStreetMap, OSRM, openrouteservice.
+
+**Places:** OpenStreetMap-based providers, Google Places.
+
+**Currency:** Frankfurter or suitable alternatives.
+
+**Additional services:** Flight status, airport information, public transport, events, official visa sources, travel advisories and insurance.
+
+Verify current API access, licensing, quotas, pricing and booking permissions.
+
+Implement provider adapters, health checks, caching, rate limits, retries, timeouts, source attribution and data freshness.
+
+Never fabricate live prices or booking confirmations.
+
+## Booking levels
+
+LEVEL 1: Live discovery.
+
+LEVEL 2: Booking handoff.
+
+LEVEL 3: Authorized direct booking.
+
+Financial actions must require explicit user confirmation.
+
+---
+
+# 10. BACKEND, DATABASE AND API ARCHITECTURE
+
+Preserve PostgreSQL if appropriate.
+
+Design database schemas for users, trips, itinerary versions, flights, hotels, bookings, expenses, group collaboration, documents, preferences, integrations, secret references, models, agents, workflows, prompts, RAG, evaluations, usage and security audit events.
+
+Include ER diagrams, indexes, constraints, migrations and retention policies.
+
+Use versioned APIs, typed validation and OpenAPI.
+
+Cover authentication, travel planning, providers, booking, collaboration, documents, models, agents, workflows, RAG, MCP, observability, evaluation, security and tokenomics.
+
+Never store secrets as ordinary plaintext database values.
+
+---
+
+# 11. TECHNOLOGY STACK
+
+Use the following as the starting direction, subject to repository inspection and compatibility.
+
+**Backend:**
+- Python.
+- FastAPI.
+- Pydantic.
+- SQLAlchemy.
+- PostgreSQL.
+- Alembic.
+- Existing LangGraph implementation.
+- Background worker.
+
+**Frontend:**
+- Preserve existing React implementation if appropriate.
+- React.
+- TypeScript.
+- Vite.
+- React Router.
+- TanStack Query.
+- Tailwind CSS.
+- Accessible component primitives.
+- Zod.
+- Recharts.
+- Lucide icons.
+
+**AI ecosystem:**
+- LangGraph.
+- LangChain.
+- CrewAI.
+- LiteLLM.
+- Ollama.
+- vLLM.
+- Langfuse.
+- LangSmith.
+- Phoenix.
+- OpenTelemetry.
+- DeepEval.
+- Ragas.
+- Qdrant.
+- MCP.
+- Presidio.
+- NeMo Guardrails.
+- MLflow.
+
+**Infrastructure:**
+- Docker Compose.
+- PostgreSQL.
+- Existing or suitable reverse proxy.
+- GitHub Actions.
+- Structured logging.
+- OpenTelemetry.
+
+Use optional dependencies and adapters.
+
+Do not introduce unnecessary microservices, Redis, Kafka or Kubernetes without a demonstrated need.
+
+---
+
+# 12. UI/UX — MANDATORY VISUAL REFERENCE
+
+The previously generated Voyager AI UI mockup is the PRIMARY visual reference.
+
+Reference path:
+
+`docs/design/references/voyager-ui-reference.png`
+
+The coding agent MUST inspect this image before implementing the frontend.
+
+The reference includes:
+
+- Travel Dashboard.
+- Itinerary Planner.
+- Agent Studio.
+- Observability and Evaluation Dashboard.
+
+Use it as the source of truth for:
+
+- Light theme.
+- Navigation.
+- Layout.
+- Typography.
+- Spacing.
+- Cards.
+- Panels.
+- Buttons.
+- Borders.
+- Shadows.
+- Colour palette.
+- Icons.
+- Information hierarchy.
+- Data visualization.
+
+Do not independently invent another visual theme.
+
+The image is a design reference, not a static screenshot to embed.
+
+Implement real reusable frontend components.
+
+Screens not shown must extend the same design system.
+
+Avoid generic AI dashboards, purple-heavy themes, black backgrounds with blue text, excessive gradients, glassmorphism and decorative emojis.
+
+Implement responsive layouts, accessible controls, loading states, empty states, error states and working interactions.
+
+Compare implemented screens against the reference before completing the UI phase.
+
+---
+
+# 13. EXISTING SVG AND UI COMPONENT LIBRARY — MANDATORY REUSE
+
+The repository already contains an `svg/` folder with UI components.
+
+This is an existing project asset library.
+
+It MUST be inspected and considered part of the frontend architecture.
+
+The SVG folder must not be ignored.
+
+Before creating new UI elements:
+
+1. Inspect the complete SVG folder.
+2. Identify all assets and components.
+3. Understand their existing usage.
+4. Determine which components are reusable.
+5. Map existing components to the approved Voyager design reference.
+6. Identify components requiring adaptation.
+7. Identify genuinely missing components.
+
+Create an inventory in `docs/VOYAGER_MASTER_BLUEPRINT.md`.
+
+For every asset record:
+
+- Filename.
+- Location.
+- Component or asset type.
+- Purpose.
+- Current usage.
+- Dependencies.
+- Props or interface.
+- Reusability.
+- Required modification.
+
+### Strict reuse rules
+
+- Reuse existing SVG UI components wherever appropriate.
+- Preserve their original design unless modification is necessary.
+- Do not recreate existing SVG illustrations unnecessarily.
+- Do not duplicate existing icons.
+- Do not replace custom SVG components with generic icons without justification.
+- Do not delete existing assets merely because a new design system is introduced.
+- Extend existing components when practical.
+- Preserve their functionality and visual identity.
+- Refactor only when technically or visually justified.
+- Maintain accessibility.
+- Ensure responsive rendering.
+- Verify compatibility with the new light theme.
+
+If the folder contains complete interface components, use them as frontend building blocks rather than treating everything as decorative artwork.
+
+If an existing component does not fit the new design, document the reason and propose the smallest appropriate change.
+
+### Component architecture
+
+Build a reusable component system using both:
+
+1. Existing SVG/UI components.
+2. New shared React components where required.
+
+Maintain a component inventory so the application does not develop multiple implementations of the same element.
+
+The final design system must integrate existing components naturally.
+
+---
+
+# 14. APPLICATION NAVIGATION
+
+## Travel Workspace
+
+- Home.
+- Plan a Trip.
+- My Trips.
+- Flights.
+- Hotels.
+- Activities.
+- Bookings & Wallet.
+- Budget & Expenses.
+- Group Trips.
+- Travel Companion.
+- Travel Documents.
+
+## AI Engineering Workspace
+
+- Agent Studio.
+- Models & Routing.
+- Integrations Marketplace.
+- Workflows.
+- RAG & Knowledge.
+- MCP & Tools.
+- Observability.
+- Evaluations.
+- Prompt Studio.
+- Tokenomics.
+- Security Lab.
+- Fine-tuning Lab.
+
+## General
+
+- Settings.
+- Profile.
+- Help.
+- Documentation.
+
+Keep the navigation coherent across both workspaces.
+
+---
+
+# 15. DEMO MODE AND OPEN-SOURCE EXPERIENCE
+
+Provide a working Demo Mode.
+
+Users should be able to explore Voyager without obtaining every provider credential.
+
+Include clearly labelled sample data and deterministic demonstrations for:
+
+- Trips.
+- Itineraries.
+- Flights.
+- Hotels.
+- Agent executions.
+- Traces.
+- Evaluations.
+- RAG.
+- Security tests.
+- Model comparisons.
+
+Never present simulated results as live results.
+
+Provide a single-click demonstration workflow.
+
+Support local and free integrations wherever practical.
+
+Document provider limitations, licensing and quotas.
+
+---
+
+# 16. DEPLOYMENT AND REPOSITORY STRUCTURE
+
+Prefer local-first deployment.
+
+Support:
+
+- Docker Compose.
+- Local LLMs.
+- Optional cloud models.
+- PostgreSQL.
+- Database migrations.
+- Environment configuration.
+- Health checks.
+- Backup and restore.
+- Reproducible setup.
+
+Respect the existing repository structure wherever it is sound.
+
+Document installation, environment setup, credentials, provider configuration, local models, tests, deployment and troubleshooting.
+
+---
+
+# 17. SECURITY AND RELIABILITY
+
+Retain and extend existing security controls.
+
+Mandatory requirements:
+
+- Authentication.
+- Authorization.
+- Owner-scoped data access.
+- Secure sessions.
+- CSRF protection.
+- Input validation.
+- Safe AI output rendering.
+- Secrets management.
+- SSRF protection.
+- Rate limiting.
+- Audit logging.
+- Privacy-conscious telemetry.
+- Dependency scanning.
+- Container security.
+- Booking idempotency.
+
+Never expose secrets through logs or traces.
+
+---
+
+# 18. TESTING
+
+Create:
+
+- Unit tests.
+- Integration tests.
+- API contract tests.
+- Database tests.
+- Provider adapter tests.
+- Agent tests.
+- Workflow tests.
+- Frontend component tests.
+- End-to-end tests.
+- Accessibility tests.
+- Responsive tests.
+- Performance tests.
+- Security tests.
+- Prompt-injection regression tests.
+- Model evaluation tests.
+- Booking safety tests.
+
+Use deterministic fake providers in CI.
+
+Paid credentials must not be required for the main automated test suite.
+
+---
+
+# 19. PHASE-GATED IMPLEMENTATION
+
+Implement the complete scope in finite phases.
+
+Every phase requires objectives, dependencies, modules affected, deliverables, tests, acceptance criteria, exit criteria and rollback strategy.
+
+**Phase 0 — Audit and preservation**
+
+Inspect, document and protect existing functionality.
+
+**Phase 1 — Architecture foundation**
+
+Module boundaries, configuration, integration contracts, migrations and health checks.
+
+**Phase 2 — Travel intelligence**
+
+Itinerary optimization, maps, weather, place discovery, budgets and replanning.
+
+**Phase 3 — Real travel providers**
+
+Flights, hotels, activities, pricing and booking handoff.
+
+**Phase 4 — Trip management**
+
+Bookings, wallet, expenses, documents, collaboration and offline support.
+
+**Phase 5 — Model gateway**
+
+Model registry, provider adapters, routing, fallback and cost tracking.
+
+**Phase 6 — Agent ecosystem**
+
+LangGraph, CrewAI, LangChain, Agent Studio and workflow visualization.
+
+**Phase 7 — RAG and MCP**
+
+Document ingestion, embeddings, retrieval, vector databases and MCP tools.
+
+**Phase 8 — Observability and evaluation**
+
+Langfuse, LangSmith, Phoenix, OpenTelemetry, metrics, logs, traces and evaluation.
+
+**Phase 9 — Security Lab**
+
+Input screening, authorization, tool-result screening, output screening and adversarial tests.
+
+**Phase 10 — Advanced AI**
+
+Voice, vision, multi-agent debate, fine-tuning and personalization.
+
+**Phase 11 — Complete travel companion**
+
+Disruption monitoring, notifications, advanced collaboration and offline capabilities.
+
+**Phase 12 — Open-source release**
+
+Documentation, examples, licensing, CI and reproducible deployment.
+
+A phase is complete only after its exit criteria pass.
+
+---
+
+# 20. STRICT IMPLEMENTATION RULES
+
+1. Preserve working functionality.
+2. Do not rewrite the whole application in one operation.
+3. Inspect and reuse existing SVG/UI components.
+4. Do not create duplicate assets unnecessarily.
+5. Do not duplicate existing agents.
+6. Do not install every framework as a mandatory dependency.
+7. Do not hardcode credentials.
+8. Do not bypass model routing or tool authorization.
+9. Do not leak secrets.
+10. Do not fabricate travel information.
+11. Do not disguise demo data as live data.
+12. Do not introduce unnecessary infrastructure.
+13. Do not leave non-functional controls.
+14. Do not leave critical TODOs in completed phases.
+15. Do not make breaking database changes without migrations.
+16. Do not bypass failing tests.
+17. Do not modify unrelated working modules.
+18. Do not disable security when a service fails.
+19. Do not perform financial actions without approval.
+20. Do not mark integrations connected without successful testing.
+21. Do not mark phases complete without passing acceptance criteria.
+
+---
+
+# 21. GIT AND CHANGE MANAGEMENT
+
+Before implementation:
+
+- Inspect the current branch.
+- Inspect uncommitted changes.
+- Preserve user work.
+- Create a transformation branch.
+- Establish a baseline where appropriate.
+
+For each phase:
+
+1. Implement a coherent feature set.
+2. Run tests.
+3. Run static analysis.
+4. Run formatting.
+5. Build the frontend and backend.
+6. Test relevant workflows.
+7. Update the master blueprint if an approved decision changes.
+8. Record implementation status.
+9. Commit verified work with meaningful messages.
+
+Never overwrite existing user changes.
+
+---
+
+# 22. PROGRESS TRACKING
+
+Track every phase in the master blueprint.
+
+Statuses:
+
+- NOT STARTED.
+- IN PROGRESS.
+- BLOCKED.
+- COMPLETE.
+
+For each phase record:
+
+- Completed requirements.
+- Files changed.
+- Architecture decisions.
+- Tests executed.
+- Test results.
+- External credentials required.
+- Limitations.
+- Exit criteria.
+
+If external API credentials are unavailable, test the adapter with deterministic fixtures and report the live integration as awaiting credentials.
+
+---
+
+# 23. FINAL DELIVERABLES
+
+The repository must contain:
+
+1. `docs/VOYAGER_MASTER_BLUEPRINT.md`.
+2. Transformed Voyager application.
+3. Preserved and extended travel-planning engine.
+4. Reusable travel provider adapters.
+5. Model provider and routing integrations.
+6. Agent framework adapters.
+7. Integration registry and marketplace.
+8. Agent Studio.
+9. Workflow Studio.
+10. RAG and MCP capabilities.
+11. Observability and evaluation integrations.
+12. Tokenomics.
+13. Guardrails and Security Lab.
+14. Reused and documented SVG/UI asset library.
+15. Updated reusable frontend component system.
+16. Database migrations.
+17. Environment examples without secrets.
+18. Automated tests.
+19. CI/CD.
+20. Docker Compose.
+21. Updated README.
+22. Provider documentation.
+23. Demo workflows.
+24. Licensing and contribution documentation.
+25. Phase completion and limitations report.
+
+The master blueprint is the only authoritative project specification.
+
+---
+
+# 24. FIRST EXECUTION ACTIONS
+
+Perform these actions in order:
+
+1. Inspect the complete repository.
+2. Read the original Voyager PRD.
+3. Inspect the supplied UI reference image.
+4. Locate and inspect the existing `svg/` folder.
+5. Inventory all existing SVG assets and UI components.
+6. Inspect existing React components and their dependencies.
+7. Audit existing backend and travel workflows.
+8. Identify reusable code.
+9. Document conflicts and migration risks.
+10. Design the target architecture.
+11. Create `docs/VOYAGER_MASTER_BLUEPRINT.md`.
+12. Validate the document against the actual repository.
+13. Begin Phase 0.
+
+Do not ask the user to repeat existing requirements.
+
+Use reasonable, reversible technical decisions where possible.
+
+Record genuinely blocked decisions.
+
+Do not stop after creating the blueprint. Continue into implementation phase by phase.
+
+---
+
+# FINAL PRODUCT REQUIREMENT
+
+Voyager must remain a real travel itinerary planning application.
+
+Its AI engineering ecosystem must demonstrate actual, configurable and measurable AI technologies.
+
+Its travel ecosystem must use real-world data wherever available.
+
+Its existing SVG folder and UI components must be inspected, preserved and reused wherever appropriate.
+
+Its design must follow the supplied Voyager UI mockup as the primary visual reference.
+
+The finished application should let someone plan a real trip, discover travel options, compare prices, generate and optimize itineraries, manage their journey, configure AI models and frameworks, inspect agent execution, compare quality and costs, experiment with RAG and MCP, evaluate outputs and test security.
+
+**Preserve the existing application. Reuse existing assets. Build the expanded vision incrementally. Treat the master blueprint as the binding architecture and implementation contract.**
