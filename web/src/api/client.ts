@@ -5,13 +5,16 @@ import type {
   EvaluationRunDetail,
   EvaluationRunRequest,
   EvaluationRunSummary,
+  FlightOffer,
   FrameworkInfo,
   GuardrailEventSummary,
   GuardrailScanResult,
+  HotelOffer,
   KnowledgeDocumentCreateRequest,
   KnowledgeDocumentSummary,
   KnowledgeSearchResult,
   ModelInfo,
+  PlaceSuggestion,
   PublicTripView,
   ShareLinkResponse,
   TripCreateRequest,
@@ -20,6 +23,7 @@ import type {
   TripExpense,
   TripSummary,
   ExpenseCreateRequest,
+  WeatherForecast,
 } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -154,4 +158,33 @@ export const api = {
     request<ShareLinkResponse>(`/api/trips/${tripId}/share`, { method: "POST" }),
   revokeShareLink: (tripId: string) => request<void>(`/api/trips/${tripId}/share`, { method: "DELETE" }),
   getSharedTrip: (shareToken: string) => request<PublicTripView>(`/api/public/trips/${shareToken}`),
+
+  flightsAutocomplete: (query: string) =>
+    request<PlaceSuggestion[]>(`/api/flights/autocomplete?${new URLSearchParams({ query })}`),
+  flightsSearch: (origin: string, destination: string, departDate: string, currency = "USD") =>
+    request<FlightOffer[]>(
+      `/api/flights/search?${new URLSearchParams({ origin, destination, depart_date: departDate, currency })}`
+    ),
+
+  hotelsAutocomplete: (query: string) =>
+    request<PlaceSuggestion[]>(`/api/hotels/autocomplete?${new URLSearchParams({ query })}`),
+  hotelsSearch: (
+    destId: string,
+    searchType: string,
+    checkinDate: string,
+    checkoutDate: string,
+    currency = "USD"
+  ) =>
+    request<HotelOffer[]>(
+      `/api/hotels/search?${new URLSearchParams({
+        dest_id: destId,
+        search_type: searchType,
+        checkin_date: checkinDate,
+        checkout_date: checkoutDate,
+        currency,
+      })}`
+    ),
+
+  weatherForecast: (destination: string) =>
+    request<WeatherForecast>(`/api/weather/forecast?${new URLSearchParams({ destination })}`),
 };

@@ -233,6 +233,60 @@ export interface EvaluationRunDetail extends EvaluationRunSummary {
   results: EvaluationCaseResult[];
 }
 
+export interface PlaceSuggestion {
+  title?: string;
+  subtitle?: string;
+  sky_id?: string;
+  entity_id?: string;
+  type?: string;
+  dest_id?: string;
+  search_type?: string;
+  label?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface FlightOffer {
+  price: string | null;
+  price_raw: number | null;
+  currency: string;
+  airline: string | null;
+  duration_minutes: number | null;
+  stops: number | null;
+  origin: string | null;
+  destination: string | null;
+  departure: string | null;
+  arrival: string | null;
+}
+
+export interface HotelOffer {
+  hotel_id: number | null;
+  name: string | null;
+  price_formatted: string | null;
+  price_raw: number | null;
+  currency: string;
+  review_score: number | null;
+  review_score_word: string | null;
+  star_rating: number | null;
+  photo_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface WeatherDay {
+  date: string;
+  temp_min: number;
+  temp_max: number;
+  description: string | null;
+  icon: string | null;
+}
+
+export interface WeatherForecast {
+  location: { name: string; country: string | null };
+  days: WeatherDay[];
+}
+
 export interface GuardrailScanResult {
   risk: "none" | "medium" | "high";
   categories: string[];

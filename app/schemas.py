@@ -200,6 +200,51 @@ class PublicTripView(BaseModel):
     plan: Optional[Dict[str, Any]] = None
 
 
+class FlightOffer(BaseModel):
+    price: Optional[str] = None
+    price_raw: Optional[float] = None
+    currency: str
+    airline: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    stops: Optional[int] = None
+    origin: Optional[str] = None
+    destination: Optional[str] = None
+    departure: Optional[str] = None
+    arrival: Optional[str] = None
+
+
+class HotelOffer(BaseModel):
+    hotel_id: Optional[int] = None
+    name: Optional[str] = None
+    price_formatted: Optional[str] = None
+    price_raw: Optional[float] = None
+    currency: str
+    review_score: Optional[float] = None
+    review_score_word: Optional[str] = None
+    star_rating: Optional[int] = None
+    photo_url: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+
+
+class WeatherDay(BaseModel):
+    date: str
+    temp_min: float
+    temp_max: float
+    description: Optional[str] = None
+    icon: Optional[str] = None
+
+
+class WeatherLocation(BaseModel):
+    name: str
+    country: Optional[str] = None
+
+
+class WeatherForecastResponse(BaseModel):
+    location: WeatherLocation
+    days: List[WeatherDay]
+
+
 class GuardrailEventSummary(BaseModel):
     id: str
     source: str

@@ -510,3 +510,174 @@ def test_create_knowledge_document_rejects_injection_attempt(monkeypatch):
     assert resp.status_code == 422
     assert "guardrails" in resp.json()["detail"]
     assert client.get("/api/knowledge").json() == []
+
+
+def test_flights_autocomplete_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: False)
+    resp = client.get("/api/flights/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 503
+
+
+def test_flights_autocomplete_returns_service_results(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: True)
+    fake_results = [{"title": "Goa", "subtitle": "India", "sky_id": "IGOI", "entity_id": "123", "type": "CITY"}]
+    monkeypatch.setattr(api_module.flights_api, "autocomplete_place", lambda query: fake_results)
+    resp = client.get("/api/flights/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 200
+    assert resp.json() == fake_results
+
+
+def test_flights_autocomplete_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: True)
+
+    def boom(query):
+        raise api_module.FlightsAPIError("provider failed")
+
+    monkeypatch.setattr(api_module.flights_api, "autocomplete_place", boom)
+    resp = client.get("/api/flights/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 502
+
+
+def test_flights_search_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: False)
+    resp = client.get(
+        "/api/flights/search", params={"origin": "BOM", "destination": "GOI", "depart_date": "2026-12-10"}
+    )
+    assert resp.status_code == 503
+
+
+def test_flights_search_returns_parsed_offers(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: True)
+    fake_offer = {
+        "price": "$50",
+        "price_raw": 50.0,
+        "currency": "USD",
+        "airline": "Air India Express",
+        "duration_minutes": 85,
+        "stops": 0,
+        "origin": "BOM",
+        "destination": "GOI",
+        "departure": "2026-12-10T17:45:00",
+        "arrival": "2026-12-10T19:10:00",
+    }
+    monkeypatch.setattr(api_module.flights_api, "search_one_way", lambda *a, **k: [fake_offer])
+    resp = client.get(
+        "/api/flights/search", params={"origin": "BOM", "destination": "GOI", "depart_date": "2026-12-10"}
+    )
+    assert resp.status_code == 200
+    assert resp.json() == [fake_offer]
+
+
+def test_flights_search_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.flights_api, "is_configured", lambda: True)
+
+    def boom(*a, **k):
+        raise api_module.FlightsAPIError("provider failed")
+
+    monkeypatch.setattr(api_module.flights_api, "search_one_way", boom)
+    resp = client.get(
+        "/api/flights/search", params={"origin": "BOM", "destination": "GOI", "depart_date": "2026-12-10"}
+    )
+    assert resp.status_code == 502
+
+
+def test_hotels_autocomplete_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: False)
+    resp = client.get("/api/hotels/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 503
+
+
+def test_hotels_autocomplete_returns_service_results(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: True)
+    fake_results = [{"dest_id": "-2114039", "search_type": "CITY", "label": "Goa, India", "country": "India", "latitude": 15.3, "longitude": 74.1}]
+    monkeypatch.setattr(api_module.hotels_api, "search_destination", lambda query: fake_results)
+    resp = client.get("/api/hotels/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 200
+    assert resp.json() == fake_results
+
+
+def test_hotels_autocomplete_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: True)
+
+    def boom(query):
+        raise api_module.HotelsAPIError("provider failed")
+
+    monkeypatch.setattr(api_module.hotels_api, "search_destination", boom)
+    resp = client.get("/api/hotels/autocomplete", params={"query": "Goa"})
+    assert resp.status_code == 502
+
+
+def test_hotels_search_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: False)
+    resp = client.get(
+        "/api/hotels/search",
+        params={"dest_id": "-2114039", "search_type": "CITY", "checkin_date": "2026-12-10", "checkout_date": "2026-12-15"},
+    )
+    assert resp.status_code == 503
+
+
+def test_hotels_search_returns_parsed_offers(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: True)
+    fake_offer = {
+        "hotel_id": 1,
+        "name": "Taj Fort Aguada",
+        "price_formatted": "$150",
+        "price_raw": 150.0,
+        "currency": "USD",
+        "review_score": 8.9,
+        "review_score_word": "Excellent",
+        "star_rating": 5,
+        "photo_url": "https://example.com/p.jpg",
+        "latitude": 15.4,
+        "longitude": 73.7,
+    }
+    monkeypatch.setattr(api_module.hotels_api, "search_hotels", lambda *a, **k: [fake_offer])
+    resp = client.get(
+        "/api/hotels/search",
+        params={"dest_id": "-2114039", "search_type": "CITY", "checkin_date": "2026-12-10", "checkout_date": "2026-12-15"},
+    )
+    assert resp.status_code == 200
+    assert resp.json() == [fake_offer]
+
+
+def test_hotels_search_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.hotels_api, "is_configured", lambda: True)
+
+    def boom(*a, **k):
+        raise api_module.HotelsAPIError("provider failed")
+
+    monkeypatch.setattr(api_module.hotels_api, "search_hotels", boom)
+    resp = client.get(
+        "/api/hotels/search",
+        params={"dest_id": "-2114039", "search_type": "CITY", "checkin_date": "2026-12-10", "checkout_date": "2026-12-15"},
+    )
+    assert resp.status_code == 502
+
+
+def test_weather_forecast_503_when_not_configured(monkeypatch):
+    monkeypatch.setattr(api_module.weather_api, "is_configured", lambda: False)
+    resp = client.get("/api/weather/forecast", params={"destination": "Goa"})
+    assert resp.status_code == 503
+
+
+def test_weather_forecast_returns_parsed_forecast(monkeypatch):
+    monkeypatch.setattr(api_module.weather_api, "is_configured", lambda: True)
+    fake_forecast = {
+        "location": {"name": "Goa", "country": "IN"},
+        "days": [{"date": "2026-12-10", "temp_min": 24.0, "temp_max": 30.5, "description": "clear sky", "icon": "01d"}],
+    }
+    monkeypatch.setattr(api_module.weather_api, "get_forecast", lambda destination: fake_forecast)
+    resp = client.get("/api/weather/forecast", params={"destination": "Goa"})
+    assert resp.status_code == 200
+    assert resp.json() == fake_forecast
+
+
+def test_weather_forecast_502_on_provider_error(monkeypatch):
+    monkeypatch.setattr(api_module.weather_api, "is_configured", lambda: True)
+
+    def boom(destination):
+        raise api_module.WeatherAPIError("provider failed")
+
+    monkeypatch.setattr(api_module.weather_api, "get_forecast", boom)
+    resp = client.get("/api/weather/forecast", params={"destination": "Goa"})
+    assert resp.status_code == 502

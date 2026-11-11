@@ -51,6 +51,10 @@ from rag import EmbeddingUnavailableError, ingest_document, list_documents, sear
 from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
 from guardrails import is_blocked, scan_text  # noqa: E402
 from documents import DocumentTooLargeError, delete_document_file, save_document_bytes  # noqa: E402
+from services import flights_api, hotels_api, weather_api  # noqa: E402
+from services.flights_api import FlightsAPIError  # noqa: E402
+from services.hotels_api import HotelsAPIError  # noqa: E402
+from services.weather_api import WeatherAPIError  # noqa: E402
 from app.models_db import EvaluationRun, GuardrailEvent, TripDocument  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
@@ -67,8 +71,10 @@ from app.schemas import (  # noqa: E402
     EvaluationRunSummary,
     Expense,
     ExpenseCreateRequest,
+    FlightOffer,
     FrameworkInfoResponse,
     GuardrailEventSummary,
+    HotelOffer,
     GuardrailScanRequest,
     GuardrailScanResult,
     KnowledgeDocumentCreateRequest,
@@ -82,6 +88,7 @@ from app.schemas import (  # noqa: E402
     TripDetail,
     TripDocumentSummary,
     TripSummary,
+    WeatherForecastResponse,
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 
@@ -563,3 +570,71 @@ def get_shared_trip(share_token: str, db: Session = Depends(get_db)):
     if trip is None:
         raise HTTPException(status_code=404, detail="Shared trip not found")
     return trip
+
+
+# --- Real travel providers (Phase 3) --------------------------------------------
+# Standalone, real-data lookup tools (RapidAPI's Flights Scraper Sky + Booking
+# COM, and OpenWeatherMap) — deliberately kept separate from the LLM-based
+# planning pipeline (app/workflow.py, app/orchestration) rather than fused
+# into it; see the blueprint's Phase 3 delivery notes for why.
+
+@app.get("/api/flights/autocomplete")
+def flights_autocomplete(query: str):
+    if not flights_api.is_configured():
+        raise HTTPException(status_code=503, detail="RAPIDAPI_KEY not configured on the server")
+    try:
+        return flights_api.autocomplete_place(query)
+    except FlightsAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/flights/search", response_model=List[FlightOffer])
+def flights_search(origin: str, destination: str, depart_date: str, currency: str = "USD"):
+    if not flights_api.is_configured():
+        raise HTTPException(status_code=503, detail="RAPIDAPI_KEY not configured on the server")
+    try:
+        offers = flights_api.search_one_way(origin, destination, depart_date, currency=currency)
+    except FlightsAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return [FlightOffer(**o) for o in offers]
+
+
+@app.get("/api/hotels/autocomplete")
+def hotels_autocomplete(query: str):
+    if not hotels_api.is_configured():
+        raise HTTPException(status_code=503, detail="RAPIDAPI_KEY not configured on the server")
+    try:
+        return hotels_api.search_destination(query)
+    except HotelsAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/hotels/search", response_model=List[HotelOffer])
+def hotels_search(
+    dest_id: str,
+    search_type: str,
+    checkin_date: str,
+    checkout_date: str,
+    adults: int = 2,
+    room_qty: int = 1,
+    currency: str = "USD",
+):
+    if not hotels_api.is_configured():
+        raise HTTPException(status_code=503, detail="RAPIDAPI_KEY not configured on the server")
+    try:
+        offers = hotels_api.search_hotels(
+            dest_id, search_type, checkin_date, checkout_date, adults=adults, room_qty=room_qty, currency=currency
+        )
+    except HotelsAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return [HotelOffer(**o) for o in offers]
+
+
+@app.get("/api/weather/forecast", response_model=WeatherForecastResponse)
+def weather_forecast(destination: str):
+    if not weather_api.is_configured():
+        raise HTTPException(status_code=503, detail="OPENWEATHER_API_KEY not configured on the server")
+    try:
+        return weather_api.get_forecast(destination)
+    except WeatherAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))

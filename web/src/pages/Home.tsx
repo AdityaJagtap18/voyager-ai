@@ -4,12 +4,12 @@ import { api } from "../api/client";
 import type { TripSummary } from "../types";
 
 const quickLinks = [
-  { label: "Flights", sub: "Search & compare", icon: "Travel/flights.svg" },
-  { label: "Hotels", sub: "Find & book", icon: "Travel/hotels.svg" },
-  { label: "Itinerary", sub: "AI-optimized", icon: "Travel/itinerary.svg" },
-  { label: "Weather", sub: "Forecast & alerts", icon: "Travel/weather.svg" },
-  { label: "Budget", sub: "Plan & track", icon: "Navigation/budget.svg" },
-  { label: "Maps", sub: "Routes & explore", icon: "Travel/map.svg" },
+  { label: "Flights", sub: "Search & compare", icon: "Travel/flights.svg", to: "/flights" },
+  { label: "Hotels", sub: "Find & book", icon: "Travel/hotels.svg", to: "/hotels" },
+  { label: "Itinerary", sub: "AI-optimized", icon: "Travel/itinerary.svg", to: "/plan" },
+  { label: "Weather", sub: "Forecast & alerts", icon: "Travel/weather.svg", to: "/weather" },
+  { label: "Budget", sub: "Plan & track", icon: "Navigation/budget.svg", to: "/budget" },
+  { label: "Maps", sub: "Routes & explore", icon: "Travel/map.svg", to: null },
 ];
 
 const statusBadge: Record<string, string> = {
@@ -47,13 +47,26 @@ export default function Home() {
       </section>
 
       <section className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-        {quickLinks.map((link) => (
-          <div key={link.label} className="flex flex-col items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white p-4 text-center">
-            <img src={`/icons/${link.icon}`} alt="" className="h-8 w-8" />
-            <p className="text-sm font-semibold">{link.label}</p>
-            <p className="text-xs text-ink-500">{link.sub}</p>
-          </div>
-        ))}
+        {quickLinks.map((link) => {
+          const content = (
+            <>
+              <img src={`/icons/${link.icon}`} alt="" className="h-8 w-8" />
+              <p className="text-sm font-semibold">{link.label}</p>
+              <p className="text-xs text-ink-500">{link.sub}</p>
+            </>
+          );
+          const className =
+            "flex flex-col items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white p-4 text-center transition-shadow hover:shadow-md";
+          return link.to ? (
+            <Link key={link.label} to={link.to} className={className}>
+              {content}
+            </Link>
+          ) : (
+            <div key={link.label} className={className + " cursor-default"}>
+              {content}
+            </div>
+          );
+        })}
       </section>
 
       <section>
