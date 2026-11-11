@@ -85,7 +85,7 @@ def test_create_and_fetch_trip(monkeypatch):
         },
         "errors": [],
     }
-    monkeypatch.setattr(api_module, "get_workflow", lambda: fake_workflow)
+    monkeypatch.setattr(api_module, "get_workflow", lambda *_: fake_workflow)
 
     create_resp = client.post("/api/trips", json={
         "destination": "Goa, India",
@@ -114,7 +114,7 @@ def test_create_trip_records_workflow_failure(monkeypatch):
 
     fake_workflow = MagicMock()
     fake_workflow.plan_trip.return_value = {"success": False, "error": "provider down"}
-    monkeypatch.setattr(api_module, "get_workflow", lambda: fake_workflow)
+    monkeypatch.setattr(api_module, "get_workflow", lambda *_: fake_workflow)
 
     resp = client.post("/api/trips", json={
         "destination": "Goa, India",
@@ -215,3 +215,69 @@ def test_bookings_and_expenses_404_for_unknown_trip():
     assert client.post("/api/trips/nope/bookings", json={"type": "flight", "title": "x"}).status_code == 404
     assert client.get("/api/trips/nope/expenses").status_code == 404
     assert client.post("/api/trips/nope/expenses", json={"category": "food", "amount": 1}).status_code == 404
+
+
+def test_list_models_reports_configured_state(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(api_module.Config, "ANTHROPIC_API_KEY", None)
+
+    resp = client.get("/api/models")
+    assert resp.status_code == 200
+    by_id = {m["id"]: m for m in resp.json()}
+
+    assert by_id["gpt-3.5-turbo"]["configured"] is True
+    assert by_id["anthropic/claude-3-5-sonnet-20241022"]["configured"] is False
+    assert by_id["ollama/llama3"]["local"] is True
+    assert by_id["ollama/llama3"]["configured"] is True  # no key needed
+
+
+def test_create_trip_rejects_unknown_model(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "model": "gpt-5-made-up",
+    })
+    assert resp.status_code == 422
+
+
+def test_create_trip_503s_for_unconfigured_model(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(api_module.Config, "ANTHROPIC_API_KEY", None)
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "model": "anthropic/claude-3-5-sonnet-20241022",
+    })
+    assert resp.status_code == 503
+    assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
+
+
+def test_create_trip_records_which_model_was_used(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+
+    fake_workflow = MagicMock()
+    fake_workflow.plan_trip.return_value = {
+        "success": True,
+        "plan": {"attractions": [], "itinerary": {}, "restaurants": [], "accommodations": []},
+        "errors": [],
+    }
+    seen_models = []
+
+    def fake_get_workflow(model_id):
+        seen_models.append(model_id)
+        return fake_workflow
+
+    monkeypatch.setattr(api_module, "get_workflow", fake_get_workflow)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "model": "gpt-4o-mini",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["model"] == "gpt-4o-mini"
+    assert seen_models == ["gpt-4o-mini"]

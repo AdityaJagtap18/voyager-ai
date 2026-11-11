@@ -2,31 +2,26 @@
 Enhanced Itinerary Agent with Integrated Dining and Travel Time Management
 Organizes attractions AND meals into a complete day schedule with accurate timing
 """
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from typing import List, Dict, Tuple, Optional
 import json
 from math import radians, cos, sin, asin, sqrt
 
-from config import Config
+from llm_gateway import get_chat_model
 from utils.logger import logger
 from services.ors_api import geocode, matrix_distances, ORSError
 
 
 class ItineraryAgent:
     """Agent that creates day-by-day itinerary with attractions AND dining"""
-    
+
     BUFFER_TIME_HOURS = 0.25  # 15 minutes buffer between activities
     MAX_DAY_TRIP_DISTANCE = 100  # Maximum km for day trip attractions
     MAX_REASONABLE_DISTANCE = 50  # Maximum km from city center for geocoding validation
-    
-    def __init__(self):
-        """Initialize the agent with OpenAI"""
-        self.llm = ChatOpenAI(
-            model=Config.OPENAI_MODEL,
-            temperature=Config.OPENAI_TEMPERATURE,
-            api_key=Config.OPENAI_API_KEY
-        )
+
+    def __init__(self, model: Optional[str] = None):
+        """Initialize the agent with a chat model from the model gateway (Phase 5)"""
+        self.llm = get_chat_model(model)
         logger.info("Itinerary Agent initialized with ORS and dining integration")
     
     def _geocode_attractions(self, attractions: List[Dict], destination: str) -> List[Dict]:

@@ -4,7 +4,7 @@ from agents.research_agent import ResearchAgent
 
 
 def _agent_with_fake_llm():
-    with patch("agents.research_agent.ChatOpenAI"):
+    with patch("agents.research_agent.get_chat_model"):
         agent = ResearchAgent()
     return agent
 

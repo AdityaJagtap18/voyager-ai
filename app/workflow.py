@@ -31,13 +31,16 @@ class TravelPlanState(TypedDict):
 
 class MultiAgentWorkflow:
     """Orchestrates multiple agents with integrated dining in itinerary"""
-    
-    def __init__(self):
-        logger.info("Initializing Multi-Agent Workflow with integrated dining")
-        self.research_agent = ResearchAgent()
-        self.itinerary_agent = ItineraryAgent()
-        self.dining_agent = DiningAgent()
-        self.accommodation_agent = AccommodationAgent()
+
+    def __init__(self, model: Optional[str] = None):
+        """model: a model id from app/llm_gateway.py's MODEL_REGISTRY (Phase 5);
+        None uses the configured default (OPENAI_MODEL) for every agent."""
+        logger.info(f"Initializing Multi-Agent Workflow with integrated dining (model={model or 'default'})")
+        self.model = model
+        self.research_agent = ResearchAgent(model=model)
+        self.itinerary_agent = ItineraryAgent(model=model)
+        self.dining_agent = DiningAgent(model=model)
+        self.accommodation_agent = AccommodationAgent(model=model)
         self.graph = self._build_graph()
         logger.info("Multi-Agent Workflow ready")
     
@@ -201,6 +204,6 @@ class MultiAgentWorkflow:
             }
 
 
-def create_workflow() -> MultiAgentWorkflow:
+def create_workflow(model: Optional[str] = None) -> MultiAgentWorkflow:
     """Factory function to create a workflow instance"""
-    return MultiAgentWorkflow()
+    return MultiAgentWorkflow(model=model)

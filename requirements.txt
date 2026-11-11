@@ -8,6 +8,11 @@ langchain-openai
 langchain-community
 openai
 
+# Phase 5: provider-agnostic model gateway (OpenAI/Anthropic/Gemini/Ollama/...
+# through one unified `model` string, instead of each agent hardcoding ChatOpenAI)
+litellm
+langchain-litellm
+
 # ==========================================
 # API Framework
 # ==========================================

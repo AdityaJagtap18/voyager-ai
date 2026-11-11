@@ -38,6 +38,9 @@ export default function TripDetail() {
       <div className="mt-2 mb-6 flex items-center gap-3">
         <h1 className="text-2xl font-bold">{trip.destination}</h1>
         <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">{trip.status}</span>
+        {trip.model && (
+          <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">{trip.model}</span>
+        )}
       </div>
 
       <p className="mb-6 text-sm text-ink-500">

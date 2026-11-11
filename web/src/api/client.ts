@@ -1,6 +1,7 @@
 import type {
   Booking,
   BookingCreateRequest,
+  ModelInfo,
   TripCreateRequest,
   TripDetail,
   TripExpense,
@@ -35,6 +36,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<{ status: string; config_valid: boolean }>("/api/health"),
+  listModels: () => request<ModelInfo[]>("/api/models"),
   listTrips: () => request<TripSummary[]>("/api/trips"),
   getTrip: (id: string) => request<TripDetail>(`/api/trips/${id}`),
   createTrip: (payload: TripCreateRequest) =>

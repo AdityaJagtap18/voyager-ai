@@ -1,7 +1,7 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
-import { BUDGET_LEVELS, TRIP_TYPES } from "../types";
+import { BUDGET_LEVELS, TRIP_TYPES, type ModelInfo } from "../types";
 
 export default function PlanTrip() {
   const navigate = useNavigate();
@@ -10,8 +10,17 @@ export default function PlanTrip() {
   const [tripType, setTripType] = useState<string>(TRIP_TYPES[0]);
   const [budget, setBudget] = useState<string>("mid-range");
   const [dietary, setDietary] = useState("");
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [model, setModel] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .listModels()
+      .then(setModels)
+      .catch(() => setModels([]));
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -27,6 +36,7 @@ export default function PlanTrip() {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean),
+        model: model || undefined,
       });
       navigate(`/trips/${trip.id}`);
     } catch (e) {
@@ -95,6 +105,23 @@ export default function PlanTrip() {
             {TRIP_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Model <span className="font-normal text-ink-500">(optional — defaults to the server's configured model)</span>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="rounded-lg border border-ink-900/10 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            <option value="">Default</option>
+            {models.map((m) => (
+              <option key={m.id} value={m.id} disabled={!m.configured}>
+                {m.label}
+                {m.configured ? "" : " (needs API key)"}
               </option>
             ))}
           </select>

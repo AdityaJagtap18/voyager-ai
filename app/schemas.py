@@ -17,6 +17,7 @@ class TripCreateRequest(BaseModel):
     trip_type: str = Field(..., examples=["foodie"])
     budget: str = Field("mid-range", examples=["mid-range"])
     dietary_preferences: List[str] = Field(default_factory=list)
+    model: Optional[str] = Field(None, description="Model id from GET /api/models; omit for the configured default")
 
 
 class TripSummary(BaseModel):
@@ -36,6 +37,16 @@ class TripDetail(TripSummary):
     plan: Optional[Dict[str, Any]] = None
     errors: List[str] = Field(default_factory=list)
     budget_amount: Optional[float] = None
+    model: Optional[str] = None
+
+
+class ModelInfoResponse(BaseModel):
+    id: str
+    label: str
+    provider: str
+    context_window: int
+    local: bool
+    configured: bool
 
 
 class TripBudgetUpdate(BaseModel):

@@ -91,6 +91,7 @@ export interface TripDetail extends TripSummary {
   plan: TripPlan | null;
   errors: string[];
   budget_amount: number | null;
+  model: string | null;
 }
 
 export interface TripCreateRequest {
@@ -99,6 +100,16 @@ export interface TripCreateRequest {
   trip_type: string;
   budget: string;
   dietary_preferences: string[];
+  model?: string;
+}
+
+export interface ModelInfo {
+  id: string;
+  label: string;
+  provider: string;
+  context_window: number;
+  local: boolean;
+  configured: boolean;
 }
 
 export const BOOKING_TYPES = ["flight", "hotel", "activity", "other"] as const;

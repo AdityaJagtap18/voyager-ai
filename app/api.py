@@ -11,7 +11,7 @@ Run with:
 import os
 import sys
 from contextlib import asynccontextmanager
-from typing import List
+from typing import Dict, List
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,11 +24,20 @@ _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
-from app.config import Config  # noqa: E402
 from app.db import get_db, init_db  # noqa: E402
 from app.models_db import Booking as BookingModel  # noqa: E402
 from app.models_db import Expense as ExpenseModel  # noqa: E402
 from app.models_db import Trip  # noqa: E402
+
+# Bare imports (not `app.config`/`app.llm_gateway`): the agent modules these
+# transitively construct (via app.workflow -> agents.* -> llm_gateway -> config)
+# all resolve `config`/`llm_gateway` as bare top-level modules once app/ is on
+# sys.path (see the sys.path.insert above) — importing them the same way here
+# means api.py shares the *same* Config/registry objects the agents see,
+# instead of a second copy with its own independently-loaded state, which
+# would make monkeypatching Config in tests silently not apply.
+from config import Config  # noqa: E402
+from llm_gateway import MODEL_REGISTRY, is_configured, resolve_model  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -40,12 +49,13 @@ from app.schemas import (  # noqa: E402
     BookingStatusUpdate,
     Expense,
     ExpenseCreateRequest,
+    ModelInfoResponse,
     TripBudgetUpdate,
     TripCreateRequest,
     TripDetail,
     TripSummary,
 )
-from app.workflow import create_workflow  # noqa: E402
+from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -63,20 +73,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_workflow = None
+_workflows: Dict[str, MultiAgentWorkflow] = {}
 
 
-def get_workflow():
-    """Lazily construct the LangGraph workflow (requires OPENAI_API_KEY)."""
-    global _workflow
-    if _workflow is None:
-        _workflow = create_workflow()
-    return _workflow
+def get_workflow(model_id: str) -> MultiAgentWorkflow:
+    """Lazily construct (and cache) a workflow for the given resolved model id.
+
+    One LangGraph workflow per model: switching models shouldn't require a
+    server restart, and a workflow is cheap to build (it just wires up four
+    agent objects) — only the chat model calls inside it talk to a network.
+    """
+    if model_id not in _workflows:
+        _workflows[model_id] = create_workflow(model=model_id)
+    return _workflows[model_id]
 
 
 @app.get("/api/health")
 def health():
     return {"status": "ok", "config_valid": bool(Config.OPENAI_API_KEY)}
+
+
+@app.get("/api/models", response_model=List[ModelInfoResponse])
+def list_models():
+    return [
+        ModelInfoResponse(
+            id=m.id,
+            label=m.label,
+            provider=m.provider,
+            context_window=m.context_window,
+            local=m.local,
+            configured=is_configured(m.id),
+        )
+        for m in MODEL_REGISTRY.values()
+    ]
 
 
 @app.get("/api/trips", response_model=List[TripSummary])
@@ -98,8 +127,16 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail=f"trip_type must be one of {TRIP_TYPES}")
     if payload.budget.lower() not in BUDGET_LEVELS:
         raise HTTPException(status_code=422, detail=f"budget must be one of {BUDGET_LEVELS}")
-    if not Config.OPENAI_API_KEY:
-        raise HTTPException(status_code=503, detail="Server is missing OPENAI_API_KEY; cannot plan trips")
+    if payload.model and payload.model not in MODEL_REGISTRY:
+        raise HTTPException(status_code=422, detail=f"model must be one of {list(MODEL_REGISTRY)}")
+
+    model_id = resolve_model(payload.model)
+    if not is_configured(model_id):
+        info = MODEL_REGISTRY[model_id]
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model '{model_id}' needs {info.requires_env} to be set on the server; it isn't configured",
+        )
 
     trip = Trip(
         destination=payload.destination,
@@ -107,6 +144,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         trip_type=payload.trip_type,
         budget=payload.budget,
         dietary_preferences=payload.dietary_preferences,
+        model=model_id,
         status="planning",
     )
     db.add(trip)
@@ -114,7 +152,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
     db.refresh(trip)
 
     try:
-        workflow = get_workflow()
+        workflow = get_workflow(model_id)
         result = workflow.plan_trip(
             destination=trip.destination,
             days=trip.days,

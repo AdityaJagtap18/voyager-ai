@@ -2,25 +2,20 @@
 Research Agent
 Finds attractions and points of interest based on destination and trip type
 """
-from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from typing import List, Dict
+from typing import List, Dict, Optional
 import json
 
-from config import Config
+from llm_gateway import get_chat_model
 from utils.logger import logger
 
 
 class ResearchAgent:
     """Agent that researches attractions for a destination"""
-    
-    def __init__(self):
-        """Initialize the agent with OpenAI"""
-        self.llm = ChatOpenAI(
-            model=Config.OPENAI_MODEL,
-            temperature=Config.OPENAI_TEMPERATURE,
-            api_key=Config.OPENAI_API_KEY
-        )
+
+    def __init__(self, model: Optional[str] = None):
+        """Initialize the agent with a chat model from the model gateway (Phase 5)"""
+        self.llm = get_chat_model(model)
         logger.info(" Research Agent initialized")
     
     def find_attractions(

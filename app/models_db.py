@@ -36,6 +36,11 @@ class Trip(Base):
     # only steers what the agents recommend.
     budget_amount = Column(Float, nullable=True)
 
+    # Phase 5: which model gateway id (app/llm_gateway.py's MODEL_REGISTRY) was
+    # actually used to plan this trip — recorded for comparison/audit, not just
+    # requested-and-forgotten.
+    model = Column(String(100), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
