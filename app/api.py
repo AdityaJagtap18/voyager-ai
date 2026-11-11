@@ -47,7 +47,8 @@ from orchestration import (  # noqa: E402
 )
 from rag import EmbeddingUnavailableError, ingest_document, list_documents, search_knowledge  # noqa: E402
 from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
-from app.models_db import EvaluationRun  # noqa: E402
+from guardrails import is_blocked, scan_text  # noqa: E402
+from app.models_db import EvaluationRun, GuardrailEvent  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -64,6 +65,9 @@ from app.schemas import (  # noqa: E402
     Expense,
     ExpenseCreateRequest,
     FrameworkInfoResponse,
+    GuardrailEventSummary,
+    GuardrailScanRequest,
+    GuardrailScanResult,
     KnowledgeDocumentCreateRequest,
     KnowledgeDocumentSummary,
     KnowledgeSearchResult,
@@ -126,6 +130,24 @@ def get_orchestrator(framework_id: str, model_id: str):
     return _orchestrators[key]
 
 
+def _run_guardrail_scan(text: str, source: str, db: Session) -> dict:
+    """Scan `text`, log the result as a GuardrailEvent, and return the scan
+    result dict (with `blocked` added) for the caller to act on."""
+    result = scan_text(text)
+    blocked = is_blocked(result)
+    db.add(
+        GuardrailEvent(
+            source=source,
+            text_excerpt=text[:500],
+            risk=result["risk"],
+            categories=result["categories"],
+            blocked=blocked,
+        )
+    )
+    db.commit()
+    return {**result, "blocked": blocked}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok", "config_valid": bool(Config.OPENAI_API_KEY)}
@@ -166,6 +188,13 @@ def list_agents():
 
 @app.post("/api/knowledge", response_model=KnowledgeDocumentSummary, status_code=201)
 def create_knowledge_document(payload: KnowledgeDocumentCreateRequest, db: Session = Depends(get_db)):
+    scan = _run_guardrail_scan(f"{payload.title}\n{payload.content}", "knowledge_ingest", db)
+    if scan["blocked"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Note rejected by the guardrails scanner (risk: {scan['risk']}, categories: {scan['categories']})",
+        )
+
     try:
         document, chunk_count = ingest_document(payload.destination, payload.title, payload.content, db=db)
     except EmbeddingUnavailableError as exc:
@@ -218,6 +247,13 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail=f"model must be one of {list(MODEL_REGISTRY)}")
     if payload.framework and payload.framework not in FRAMEWORK_REGISTRY:
         raise HTTPException(status_code=422, detail=f"framework must be one of {list(FRAMEWORK_REGISTRY)}")
+
+    scan = _run_guardrail_scan(payload.destination, "trip_destination", db)
+    if scan["blocked"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Destination rejected by the guardrails scanner (risk: {scan['risk']}, categories: {scan['categories']})",
+        )
 
     model_id = resolve_model(payload.model)
     if not is_configured(model_id):
@@ -417,3 +453,19 @@ def get_evaluation_run(run_id: str, db: Session = Depends(get_db)):
 @app.get("/api/evaluations/cases/list")
 def list_evaluation_cases():
     return [{"id": c["id"], "description": c["description"]} for c in EVAL_CASES]
+
+
+# --- Security Lab / Guardrails (Phase 9) ----------------------------------------
+# Heuristic prompt-injection scanning (app/guardrails) applied to the two real
+# injection surfaces in this app — RAG knowledge content and a trip's
+# destination, both of which get concatenated straight into an agent's LLM
+# prompt — plus an ad-hoc playground endpoint and an audit log of every scan.
+
+@app.post("/api/guardrails/scan", response_model=GuardrailScanResult)
+def run_guardrail_scan(payload: GuardrailScanRequest, db: Session = Depends(get_db)):
+    return _run_guardrail_scan(payload.text, "manual_scan", db)
+
+
+@app.get("/api/guardrails/events", response_model=List[GuardrailEventSummary])
+def list_guardrail_events(db: Session = Depends(get_db)):
+    return db.query(GuardrailEvent).order_by(GuardrailEvent.created_at.desc()).limit(100).all()

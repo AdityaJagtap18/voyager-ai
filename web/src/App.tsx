@@ -11,6 +11,7 @@ import AgentStudio from "./pages/AgentStudio";
 import RagKnowledge from "./pages/RagKnowledge";
 import Observability from "./pages/Observability";
 import Evaluations from "./pages/Evaluations";
+import SecurityLab from "./pages/SecurityLab";
 
 export default function App() {
   return (
@@ -50,7 +51,7 @@ export default function App() {
         <Route path="/ai/workflows" element={<ComingSoon title="Workflows" />} />
         <Route path="/ai/observability" element={<Observability />} />
         <Route path="/ai/evaluations" element={<Evaluations />} />
-        <Route path="/ai/security" element={<ComingSoon title="Security Lab" />} />
+        <Route path="/ai/security" element={<SecurityLab />} />
       </Route>
     </Routes>
   );

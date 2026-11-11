@@ -8,7 +8,7 @@ could otherwise be mistaken for LLM model config, which belongs to a later phase
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text, JSON
 
 from app.db import Base
 
@@ -108,6 +108,22 @@ class EvaluationRun(Base):
     pass_count = Column(Integer, nullable=False, default=0)
     fail_count = Column(Integer, nullable=False, default=0)
     results = Column(JSON, nullable=False, default=list)  # [{case_id, passed, reason, duration_ms}]
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# Phase 9: Security Lab. An audit log entry for each guardrail scan run
+# against user-supplied text that ends up in an agent prompt (RAG knowledge
+# content, a trip's destination, or an ad-hoc scan from the Security Lab UI).
+class GuardrailEvent(Base):
+    __tablename__ = "guardrail_events"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    source = Column(String(50), nullable=False)  # knowledge_ingest | trip_destination | manual_scan
+    text_excerpt = Column(String(500), nullable=False)
+    risk = Column(String(20), nullable=False)  # none | medium | high
+    categories = Column(JSON, nullable=False, default=list)
+    blocked = Column(Boolean, nullable=False, default=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

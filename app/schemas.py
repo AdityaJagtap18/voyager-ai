@@ -162,3 +162,26 @@ class EvaluationRunSummary(BaseModel):
 
 class EvaluationRunDetail(EvaluationRunSummary):
     results: List[EvaluationCaseResult]
+
+
+class GuardrailScanRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=20000)
+
+
+class GuardrailScanResult(BaseModel):
+    risk: str
+    categories: List[str]
+    matches: List[str]
+    blocked: bool
+
+
+class GuardrailEventSummary(BaseModel):
+    id: str
+    source: str
+    text_excerpt: str
+    risk: str
+    categories: List[str]
+    blocked: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

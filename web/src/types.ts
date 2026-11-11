@@ -231,3 +231,20 @@ export interface EvaluationRunSummary {
 export interface EvaluationRunDetail extends EvaluationRunSummary {
   results: EvaluationCaseResult[];
 }
+
+export interface GuardrailScanResult {
+  risk: "none" | "medium" | "high";
+  categories: string[];
+  matches: string[];
+  blocked: boolean;
+}
+
+export interface GuardrailEventSummary {
+  id: string;
+  source: string;
+  text_excerpt: string;
+  risk: "none" | "medium" | "high";
+  categories: string[];
+  blocked: boolean;
+  created_at: string;
+}

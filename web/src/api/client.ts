@@ -6,6 +6,8 @@ import type {
   EvaluationRunRequest,
   EvaluationRunSummary,
   FrameworkInfo,
+  GuardrailEventSummary,
+  GuardrailScanResult,
   KnowledgeDocumentCreateRequest,
   KnowledgeDocumentSummary,
   KnowledgeSearchResult,
@@ -84,4 +86,8 @@ export const api = {
   getEvaluationRun: (id: string) => request<EvaluationRunDetail>(`/api/evaluations/${id}`),
   createEvaluationRun: (payload: EvaluationRunRequest) =>
     request<EvaluationRunDetail>("/api/evaluations", { method: "POST", body: JSON.stringify(payload) }),
+
+  scanText: (text: string) =>
+    request<GuardrailScanResult>("/api/guardrails/scan", { method: "POST", body: JSON.stringify({ text }) }),
+  listGuardrailEvents: () => request<GuardrailEventSummary[]>("/api/guardrails/events"),
 };
