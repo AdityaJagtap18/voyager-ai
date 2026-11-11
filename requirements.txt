@@ -9,10 +9,11 @@ langchain-community
 openai
 
 # ==========================================
-# API Framework (for later)
+# API Framework
 # ==========================================
 fastapi
 uvicorn[standard]
+sqlalchemy
 
 # ==========================================
 # Configuration & Environment
@@ -22,7 +23,7 @@ pydantic
 pydantic-settings
 
 # ==========================================
-# HTTP Clients (for APIs later)
+# HTTP Clients
 # ==========================================
 httpx
 requests

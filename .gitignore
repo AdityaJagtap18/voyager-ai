@@ -66,6 +66,15 @@ htmlcov/
 # Data - Generated itineraries
 app/data/itineraries/*.json
 
+# Local SQLite database (Phase 2 backend)
+/data/
+*.db
+*.db-journal
+
+# Frontend (Phase 2)
+web/node_modules/
+web/dist/
+
 # Jupyter Notebooks
 .ipynb_checkpoints
 *.ipynb
