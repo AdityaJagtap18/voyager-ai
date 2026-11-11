@@ -255,6 +255,64 @@ def test_create_trip_503s_for_unconfigured_model(monkeypatch):
     assert "ANTHROPIC_API_KEY" in resp.json()["detail"]
 
 
+def test_list_frameworks_reports_langgraph_always_available(monkeypatch):
+    resp = client.get("/api/frameworks")
+    assert resp.status_code == 200
+    by_id = {f["id"]: f for f in resp.json()}
+    assert by_id["langgraph"]["available"] is True
+    assert "crewai" in by_id
+
+
+def test_list_agents_reports_four_agent_roster():
+    resp = client.get("/api/agents")
+    assert resp.status_code == 200
+    agents = resp.json()
+    assert len(agents) == 4
+    assert {a["id"] for a in agents} == {"research", "accommodation", "dining", "itinerary"}
+
+
+def test_create_trip_rejects_unknown_framework(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+        "framework": "made-up-framework",
+    })
+    assert resp.status_code == 422
+
+
+def test_create_trip_503s_for_unavailable_framework(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    monkeypatch.setattr(api_module, "is_framework_available", lambda framework_id: False)
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+    })
+    assert resp.status_code == 503
+
+
+def test_create_trip_defaults_to_langgraph_and_records_framework(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+
+    fake_workflow = MagicMock()
+    fake_workflow.plan_trip.return_value = {
+        "success": True,
+        "plan": {"attractions": [], "itinerary": {}, "restaurants": [], "accommodations": []},
+        "errors": [],
+    }
+    monkeypatch.setattr(api_module, "get_workflow", lambda *_: fake_workflow)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India",
+        "days": 3,
+        "trip_type": "foodie",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["framework"] == "langgraph"
+
+
 def test_create_trip_records_which_model_was_used(monkeypatch):
     monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
 

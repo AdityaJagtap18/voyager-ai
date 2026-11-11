@@ -41,6 +41,10 @@ class Trip(Base):
     # requested-and-forgotten.
     model = Column(String(100), nullable=True)
 
+    # Phase 6: which orchestration framework (app/orchestration's
+    # FRAMEWORK_REGISTRY — "langgraph" or "crewai") actually ran this trip.
+    framework = Column(String(50), nullable=True)
+
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 

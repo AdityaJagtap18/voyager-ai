@@ -38,17 +38,26 @@ from app.models_db import Trip  # noqa: E402
 # would make monkeypatching Config in tests silently not apply.
 from config import Config  # noqa: E402
 from llm_gateway import MODEL_REGISTRY, is_configured, resolve_model  # noqa: E402
+from orchestration import (  # noqa: E402
+    AGENT_CATALOG,
+    FRAMEWORK_REGISTRY,
+    build_orchestrator,
+    is_available as is_framework_available,
+    resolve_framework,
+)
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
     BUDGET_LEVELS,
     EXPENSE_CATEGORIES,
     TRIP_TYPES,
+    AgentInfoResponse,
     Booking,
     BookingCreateRequest,
     BookingStatusUpdate,
     Expense,
     ExpenseCreateRequest,
+    FrameworkInfoResponse,
     ModelInfoResponse,
     TripBudgetUpdate,
     TripCreateRequest,
@@ -77,7 +86,7 @@ _workflows: Dict[str, MultiAgentWorkflow] = {}
 
 
 def get_workflow(model_id: str) -> MultiAgentWorkflow:
-    """Lazily construct (and cache) a workflow for the given resolved model id.
+    """Lazily construct (and cache) a LangGraph workflow for the given resolved model id.
 
     One LangGraph workflow per model: switching models shouldn't require a
     server restart, and a workflow is cheap to build (it just wires up four
@@ -86,6 +95,26 @@ def get_workflow(model_id: str) -> MultiAgentWorkflow:
     if model_id not in _workflows:
         _workflows[model_id] = create_workflow(model=model_id)
     return _workflows[model_id]
+
+
+_orchestrators: Dict[tuple, object] = {}
+
+
+def get_orchestrator(framework_id: str, model_id: str):
+    """Lazily construct (and cache) an orchestrator for (framework_id, model_id).
+
+    langgraph is the original default, so it reuses the existing `_workflows`
+    cache via get_workflow() rather than a second parallel cache — this also
+    means tests that monkeypatch module-level `get_workflow` keep working
+    unchanged for the default framework (Phase 6 only adds a path alongside
+    it, not instead of it).
+    """
+    if framework_id == "langgraph":
+        return get_workflow(model_id)
+    key = (framework_id, model_id)
+    if key not in _orchestrators:
+        _orchestrators[key] = build_orchestrator(framework_id, model=model_id)
+    return _orchestrators[key]
 
 
 @app.get("/api/health")
@@ -106,6 +135,19 @@ def list_models():
         )
         for m in MODEL_REGISTRY.values()
     ]
+
+
+@app.get("/api/frameworks", response_model=List[FrameworkInfoResponse])
+def list_frameworks():
+    return [
+        FrameworkInfoResponse(id=f.id, label=f.label, description=f.description, available=f.available)
+        for f in FRAMEWORK_REGISTRY.values()
+    ]
+
+
+@app.get("/api/agents", response_model=List[AgentInfoResponse])
+def list_agents():
+    return [AgentInfoResponse(**agent) for agent in AGENT_CATALOG]
 
 
 @app.get("/api/trips", response_model=List[TripSummary])
@@ -129,6 +171,8 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=422, detail=f"budget must be one of {BUDGET_LEVELS}")
     if payload.model and payload.model not in MODEL_REGISTRY:
         raise HTTPException(status_code=422, detail=f"model must be one of {list(MODEL_REGISTRY)}")
+    if payload.framework and payload.framework not in FRAMEWORK_REGISTRY:
+        raise HTTPException(status_code=422, detail=f"framework must be one of {list(FRAMEWORK_REGISTRY)}")
 
     model_id = resolve_model(payload.model)
     if not is_configured(model_id):
@@ -138,6 +182,13 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
             detail=f"Model '{model_id}' needs {info.requires_env} to be set on the server; it isn't configured",
         )
 
+    framework_id = resolve_framework(payload.framework)
+    if not is_framework_available(framework_id):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Framework '{framework_id}' isn't installed on the server",
+        )
+
     trip = Trip(
         destination=payload.destination,
         days=payload.days,
@@ -145,6 +196,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         budget=payload.budget,
         dietary_preferences=payload.dietary_preferences,
         model=model_id,
+        framework=framework_id,
         status="planning",
     )
     db.add(trip)
@@ -152,7 +204,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
     db.refresh(trip)
 
     try:
-        workflow = get_workflow(model_id)
+        workflow = get_orchestrator(framework_id, model_id)
         result = workflow.plan_trip(
             destination=trip.destination,
             days=trip.days,

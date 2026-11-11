@@ -18,6 +18,7 @@ class TripCreateRequest(BaseModel):
     budget: str = Field("mid-range", examples=["mid-range"])
     dietary_preferences: List[str] = Field(default_factory=list)
     model: Optional[str] = Field(None, description="Model id from GET /api/models; omit for the configured default")
+    framework: Optional[str] = Field(None, description="Orchestration framework id from GET /api/frameworks; omit for the default (langgraph)")
 
 
 class TripSummary(BaseModel):
@@ -38,6 +39,7 @@ class TripDetail(TripSummary):
     errors: List[str] = Field(default_factory=list)
     budget_amount: Optional[float] = None
     model: Optional[str] = None
+    framework: Optional[str] = None
 
 
 class ModelInfoResponse(BaseModel):
@@ -47,6 +49,21 @@ class ModelInfoResponse(BaseModel):
     context_window: int
     local: bool
     configured: bool
+
+
+class FrameworkInfoResponse(BaseModel):
+    id: str
+    label: str
+    description: str
+    available: bool
+
+
+class AgentInfoResponse(BaseModel):
+    id: str
+    name: str
+    role: str
+    goal: str
+    data_source: str
 
 
 class TripBudgetUpdate(BaseModel):

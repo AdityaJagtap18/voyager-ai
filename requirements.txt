@@ -13,6 +13,12 @@ openai
 litellm
 langchain-litellm
 
+# Phase 6: alternative orchestration engine (app/orchestration/crewai_adapter.py)
+# driving the same four agents through CrewAI's Agent/Task/Crew instead of
+# LangGraph's StateGraph. Optional — app/orchestration reports it unavailable
+# if not installed, same pattern as an unconfigured model provider.
+crewai
+
 # ==========================================
 # API Framework
 # ==========================================

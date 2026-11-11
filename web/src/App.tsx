@@ -7,6 +7,7 @@ import TripDetail from "./pages/TripDetail";
 import TripPickerHub from "./pages/TripPickerHub";
 import ComingSoon from "./pages/ComingSoon";
 import ModelsRouting from "./pages/ModelsRouting";
+import AgentStudio from "./pages/AgentStudio";
 
 export default function App() {
   return (
@@ -40,7 +41,7 @@ export default function App() {
         <Route path="/group-trips" element={<ComingSoon title="Group Trips" />} />
         <Route path="/companion" element={<ComingSoon title="Travel Companion" />} />
 
-        <Route path="/ai/agent-studio" element={<ComingSoon title="Agent Studio" />} />
+        <Route path="/ai/agent-studio" element={<AgentStudio />} />
         <Route path="/ai/models" element={<ModelsRouting />} />
         <Route path="/ai/rag" element={<ComingSoon title="RAG & Knowledge" />} />
         <Route path="/ai/workflows" element={<ComingSoon title="Workflows" />} />

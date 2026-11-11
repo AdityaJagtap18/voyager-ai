@@ -92,6 +92,7 @@ export interface TripDetail extends TripSummary {
   errors: string[];
   budget_amount: number | null;
   model: string | null;
+  framework: string | null;
 }
 
 export interface TripCreateRequest {
@@ -101,6 +102,7 @@ export interface TripCreateRequest {
   budget: string;
   dietary_preferences: string[];
   model?: string;
+  framework?: string;
 }
 
 export interface ModelInfo {
@@ -110,6 +112,21 @@ export interface ModelInfo {
   context_window: number;
   local: boolean;
   configured: boolean;
+}
+
+export interface FrameworkInfo {
+  id: string;
+  label: string;
+  description: string;
+  available: boolean;
+}
+
+export interface AgentInfo {
+  id: string;
+  name: string;
+  role: string;
+  goal: string;
+  data_source: string;
 }
 
 export const BOOKING_TYPES = ["flight", "hotel", "activity", "other"] as const;

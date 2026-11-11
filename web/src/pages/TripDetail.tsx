@@ -41,6 +41,11 @@ export default function TripDetail() {
         {trip.model && (
           <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">{trip.model}</span>
         )}
+        {trip.framework && (
+          <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">
+            {trip.framework}
+          </span>
+        )}
       </div>
 
       <p className="mb-6 text-sm text-ink-500">

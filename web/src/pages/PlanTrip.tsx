@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api, ApiError } from "../api/client";
-import { BUDGET_LEVELS, TRIP_TYPES, type ModelInfo } from "../types";
+import { BUDGET_LEVELS, TRIP_TYPES, type FrameworkInfo, type ModelInfo } from "../types";
 
 export default function PlanTrip() {
   const navigate = useNavigate();
@@ -12,6 +12,8 @@ export default function PlanTrip() {
   const [dietary, setDietary] = useState("");
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [model, setModel] = useState<string>("");
+  const [frameworks, setFrameworks] = useState<FrameworkInfo[]>([]);
+  const [framework, setFramework] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +22,10 @@ export default function PlanTrip() {
       .listModels()
       .then(setModels)
       .catch(() => setModels([]));
+    api
+      .listFrameworks()
+      .then(setFrameworks)
+      .catch(() => setFrameworks([]));
   }, []);
 
   async function handleSubmit(e: FormEvent) {
@@ -37,6 +43,7 @@ export default function PlanTrip() {
           .map((s) => s.trim())
           .filter(Boolean),
         model: model || undefined,
+        framework: framework || undefined,
       });
       navigate(`/trips/${trip.id}`);
     } catch (e) {
@@ -122,6 +129,24 @@ export default function PlanTrip() {
               <option key={m.id} value={m.id} disabled={!m.configured}>
                 {m.label}
                 {m.configured ? "" : " (needs API key)"}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1 text-sm font-medium">
+          Orchestration framework{" "}
+          <span className="font-normal text-ink-500">(optional — see Agent Studio)</span>
+          <select
+            value={framework}
+            onChange={(e) => setFramework(e.target.value)}
+            className="rounded-lg border border-ink-900/10 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            <option value="">Default (LangGraph)</option>
+            {frameworks.map((f) => (
+              <option key={f.id} value={f.id} disabled={!f.available}>
+                {f.label}
+                {f.available ? "" : " (not installed)"}
               </option>
             ))}
           </select>
