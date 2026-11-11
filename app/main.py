@@ -11,6 +11,7 @@ from datetime import datetime
 # Add current directory to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from config import Config
 from workflow import create_workflow
 from utils.logger import logger
 
@@ -335,4 +336,5 @@ def main():
 
 
 if __name__ == "__main__":
+    Config.validate()
     main()

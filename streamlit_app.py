@@ -12,6 +12,7 @@ from datetime import datetime
 # Add app directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 
+from app.config import Config
 from app.workflow import create_workflow
 from app.utils.logger import logger
 
@@ -22,6 +23,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+try:
+    Config.validate()
+except ValueError as e:
+    st.error(str(e))
+    st.stop()
 
 # Custom CSS for better styling (dark mode compatible)
 st.markdown("""

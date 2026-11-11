@@ -37,7 +37,3 @@ class Config:
         print(f"   Temperature: {cls.OPENAI_TEMPERATURE}")
         return True
 
-
-# Validate configuration when this file is imported
-Config.validate()
-
