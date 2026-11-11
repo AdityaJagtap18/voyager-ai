@@ -45,6 +45,13 @@ class Trip(Base):
     # FRAMEWORK_REGISTRY — "langgraph" or "crewai") actually ran this trip.
     framework = Column(String(50), nullable=True)
 
+    # Phase 4 (remaining scope): a secret token that, if set, makes this
+    # trip's itinerary/restaurants/accommodations viewable read-only at
+    # /api/public/trips/{token} with no login — the "group collaboration"
+    # increment buildable without a real multi-user auth system (none exists
+    # in this app). Null means sharing is off.
+    share_token = Column(String(32), nullable=True, unique=True, index=True)
+
     # Phase 8: per-agent-step timing/status trace emitted by the orchestrator
     # that ran this trip ({step, duration_ms, status, error?} per entry) —
     # observability into where time was spent and what failed, if anything.
@@ -124,6 +131,23 @@ class GuardrailEvent(Base):
     risk = Column(String(20), nullable=False)  # none | medium | high
     categories = Column(JSON, nullable=False, default=list)
     blocked = Column(Boolean, nullable=False, default=False)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# Phase 4 (remaining scope): a file attached to a trip (a ticket PDF, a
+# passport scan, a hotel voucher) — the "documents" increment. The file
+# itself lives on disk (app/documents.py); this row is its metadata.
+class TripDocument(Base):
+    __tablename__ = "trip_documents"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    trip_id = Column(String(32), ForeignKey("trips.id"), nullable=False, index=True)
+
+    filename = Column(String(255), nullable=False)
+    content_type = Column(String(100), nullable=True)
+    size_bytes = Column(Integer, nullable=False)
+    stored_path = Column(String(500), nullable=False)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

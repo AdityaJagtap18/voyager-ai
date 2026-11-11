@@ -41,6 +41,7 @@ class TripDetail(TripSummary):
     model: Optional[str] = None
     framework: Optional[str] = None
     trace: List[Dict[str, Any]] = Field(default_factory=list)
+    share_token: Optional[str] = None
 
 
 class ModelInfoResponse(BaseModel):
@@ -173,6 +174,30 @@ class GuardrailScanResult(BaseModel):
     categories: List[str]
     matches: List[str]
     blocked: bool
+
+
+class TripDocumentSummary(BaseModel):
+    id: str
+    trip_id: str
+    filename: str
+    content_type: Optional[str]
+    size_bytes: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ShareLinkResponse(BaseModel):
+    share_token: str
+
+
+class PublicTripView(BaseModel):
+    destination: str
+    days: int
+    trip_type: str
+    budget: str
+    status: str
+    plan: Optional[Dict[str, Any]] = None
 
 
 class GuardrailEventSummary(BaseModel):

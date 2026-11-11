@@ -101,6 +101,7 @@ export interface TripDetail extends TripSummary {
   model: string | null;
   framework: string | null;
   trace: TraceEntry[];
+  share_token: string | null;
 }
 
 export interface TripCreateRequest {
@@ -247,4 +248,26 @@ export interface GuardrailEventSummary {
   categories: string[];
   blocked: boolean;
   created_at: string;
+}
+
+export interface TripDocumentSummary {
+  id: string;
+  trip_id: string;
+  filename: string;
+  content_type: string | null;
+  size_bytes: number;
+  created_at: string;
+}
+
+export interface ShareLinkResponse {
+  share_token: string;
+}
+
+export interface PublicTripView {
+  destination: string;
+  days: number;
+  trip_type: string;
+  budget: string;
+  status: string;
+  plan: TripPlan | null;
 }

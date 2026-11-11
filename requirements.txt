@@ -28,6 +28,7 @@ mcp
 fastapi
 uvicorn[standard]
 sqlalchemy
+python-multipart
 
 # ==========================================
 # Configuration & Environment

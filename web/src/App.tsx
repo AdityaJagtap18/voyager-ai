@@ -12,10 +12,12 @@ import RagKnowledge from "./pages/RagKnowledge";
 import Observability from "./pages/Observability";
 import Evaluations from "./pages/Evaluations";
 import SecurityLab from "./pages/SecurityLab";
+import SharedTrip from "./pages/SharedTrip";
 
 export default function App() {
   return (
     <Routes>
+      <Route path="/shared/:token" element={<SharedTrip />} />
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
         <Route path="/plan" element={<PlanTrip />} />

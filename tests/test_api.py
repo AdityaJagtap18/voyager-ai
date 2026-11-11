@@ -432,6 +432,75 @@ def test_create_trip_rejects_injection_attempt_in_destination(monkeypatch):
     assert "guardrails" in resp.json()["detail"]
 
 
+def test_trip_document_upload_list_download_delete_lifecycle():
+    trip_id = _create_test_trip()
+
+    upload_resp = client.post(
+        f"/api/trips/{trip_id}/documents",
+        files={"file": ("ticket.txt", b"BOM -> GOI, seat 14A", "text/plain")},
+    )
+    assert upload_resp.status_code == 201
+    doc = upload_resp.json()
+    assert doc["filename"] == "ticket.txt"
+    assert doc["size_bytes"] == len(b"BOM -> GOI, seat 14A")
+    doc_id = doc["id"]
+
+    list_resp = client.get(f"/api/trips/{trip_id}/documents")
+    assert len(list_resp.json()) == 1
+
+    download_resp = client.get(f"/api/trips/{trip_id}/documents/{doc_id}/download")
+    assert download_resp.status_code == 200
+    assert download_resp.content == b"BOM -> GOI, seat 14A"
+
+    delete_resp = client.delete(f"/api/trips/{trip_id}/documents/{doc_id}")
+    assert delete_resp.status_code == 204
+    assert client.get(f"/api/trips/{trip_id}/documents").json() == []
+
+
+def test_trip_document_upload_rejects_file_over_limit(monkeypatch):
+    trip_id = _create_test_trip()
+    import documents as documents_module
+    monkeypatch.setattr(documents_module, "MAX_DOCUMENT_BYTES", 10)
+
+    resp = client.post(
+        f"/api/trips/{trip_id}/documents",
+        files={"file": ("big.txt", b"this file is way over ten bytes", "text/plain")},
+    )
+    assert resp.status_code == 413
+
+
+def test_trip_document_404_for_unknown_trip():
+    resp = client.post("/api/trips/nope/documents", files={"file": ("x.txt", b"data", "text/plain")})
+    assert resp.status_code == 404
+    assert client.get("/api/trips/nope/documents").status_code == 404
+
+
+def test_share_link_lifecycle():
+    trip_id = _create_test_trip()
+
+    create_resp = client.post(f"/api/trips/{trip_id}/share")
+    assert create_resp.status_code == 200
+    token = create_resp.json()["share_token"]
+    assert token
+
+    # Creating again returns the same token (idempotent, not a new one each time).
+    again_resp = client.post(f"/api/trips/{trip_id}/share")
+    assert again_resp.json()["share_token"] == token
+
+    public_resp = client.get(f"/api/public/trips/{token}")
+    assert public_resp.status_code == 200
+    assert public_resp.json()["destination"] == "Goa, India"
+
+    revoke_resp = client.delete(f"/api/trips/{trip_id}/share")
+    assert revoke_resp.status_code == 204
+    assert client.get(f"/api/public/trips/{token}").status_code == 404
+
+
+def test_public_trip_view_404_for_unknown_token():
+    resp = client.get("/api/public/trips/not-a-real-token")
+    assert resp.status_code == 404
+
+
 def test_create_knowledge_document_rejects_injection_attempt(monkeypatch):
     resp = client.post("/api/knowledge", json={
         "destination": "Goa, India",

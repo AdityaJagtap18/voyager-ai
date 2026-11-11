@@ -3,9 +3,11 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
+import TripDocuments from "../components/TripDocuments";
+import TripShare from "../components/TripShare";
 import type { TripDetail as TripDetailType } from "../types";
 
-type Tab = "itinerary" | "restaurants" | "accommodations" | "bookings" | "budget";
+type Tab = "itinerary" | "restaurants" | "accommodations" | "bookings" | "budget" | "documents" | "share";
 
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>();
@@ -74,8 +76,8 @@ export default function TripDetail() {
         <>
           <div className="mb-4 flex gap-2 border-b border-ink-900/10">
             {(trip.plan
-              ? (["itinerary", "restaurants", "accommodations", "bookings", "budget"] as Tab[])
-              : (["bookings", "budget"] as Tab[])
+              ? (["itinerary", "restaurants", "accommodations", "bookings", "budget", "documents", "share"] as Tab[])
+              : (["bookings", "budget", "documents", "share"] as Tab[])
             ).map((t) => (
               <button
                 key={t}
@@ -91,6 +93,8 @@ export default function TripDetail() {
 
           {tab === "bookings" && <TripBookings tripId={trip.id} />}
           {tab === "budget" && <TripBudget tripId={trip.id} budgetAmount={trip.budget_amount} />}
+          {tab === "documents" && <TripDocuments tripId={trip.id} />}
+          {tab === "share" && <TripShare tripId={trip.id} initialToken={trip.share_token} />}
 
           {tab === "itinerary" && trip.plan && (
             <div className="flex flex-col gap-4">

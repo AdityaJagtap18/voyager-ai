@@ -9,12 +9,14 @@ Run with:
     uvicorn app.api:app --reload
 """
 import os
+import secrets
 import sys
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 # Mirror streamlit_app.py's sys.path setup: the agent modules (workflow.py and
@@ -48,7 +50,8 @@ from orchestration import (  # noqa: E402
 from rag import EmbeddingUnavailableError, ingest_document, list_documents, search_knowledge  # noqa: E402
 from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
 from guardrails import is_blocked, scan_text  # noqa: E402
-from app.models_db import EvaluationRun, GuardrailEvent  # noqa: E402
+from documents import DocumentTooLargeError, delete_document_file, save_document_bytes  # noqa: E402
+from app.models_db import EvaluationRun, GuardrailEvent, TripDocument  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -72,9 +75,12 @@ from app.schemas import (  # noqa: E402
     KnowledgeDocumentSummary,
     KnowledgeSearchResult,
     ModelInfoResponse,
+    PublicTripView,
+    ShareLinkResponse,
     TripBudgetUpdate,
     TripCreateRequest,
     TripDetail,
+    TripDocumentSummary,
     TripSummary,
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
@@ -469,3 +475,91 @@ def run_guardrail_scan(payload: GuardrailScanRequest, db: Session = Depends(get_
 @app.get("/api/guardrails/events", response_model=List[GuardrailEventSummary])
 def list_guardrail_events(db: Session = Depends(get_db)):
     return db.query(GuardrailEvent).order_by(GuardrailEvent.created_at.desc()).limit(100).all()
+
+
+# --- Trip Documents (Phase 4, remaining scope) ----------------------------------
+# File attachments per trip (ticket PDFs, passport scans, hotel vouchers),
+# stored on local disk (app/documents.py) with metadata in the DB.
+
+@app.post("/api/trips/{trip_id}/documents", response_model=TripDocumentSummary, status_code=201)
+async def upload_trip_document(trip_id: str, db: Session = Depends(get_db), file: UploadFile = File(...)):
+    _get_trip_or_404(trip_id, db)
+    data = await file.read()
+    try:
+        meta = save_document_bytes(trip_id, file.filename or "upload", data)
+    except DocumentTooLargeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc))
+
+    document = TripDocument(trip_id=trip_id, **meta)
+    db.add(document)
+    db.commit()
+    db.refresh(document)
+    return document
+
+
+@app.get("/api/trips/{trip_id}/documents", response_model=List[TripDocumentSummary])
+def list_trip_documents(trip_id: str, db: Session = Depends(get_db)):
+    _get_trip_or_404(trip_id, db)
+    return (
+        db.query(TripDocument)
+        .filter(TripDocument.trip_id == trip_id)
+        .order_by(TripDocument.created_at.desc())
+        .all()
+    )
+
+
+def _get_document_or_404(trip_id: str, document_id: str, db: Session) -> TripDocument:
+    document = db.get(TripDocument, document_id)
+    if document is None or document.trip_id != trip_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return document
+
+
+@app.get("/api/trips/{trip_id}/documents/{document_id}/download")
+def download_trip_document(trip_id: str, document_id: str, db: Session = Depends(get_db)):
+    document = _get_document_or_404(trip_id, document_id, db)
+    if not os.path.exists(document.stored_path):
+        raise HTTPException(status_code=404, detail="File missing on server")
+    return FileResponse(
+        document.stored_path, filename=document.filename, media_type=document.content_type or "application/octet-stream"
+    )
+
+
+@app.delete("/api/trips/{trip_id}/documents/{document_id}", status_code=204)
+def delete_trip_document(trip_id: str, document_id: str, db: Session = Depends(get_db)):
+    document = _get_document_or_404(trip_id, document_id, db)
+    delete_document_file(document.stored_path)
+    db.delete(document)
+    db.commit()
+
+
+# --- Shareable trip links (Phase 4, remaining scope: "group collaboration") -----
+# No multi-user accounts exist in this app (see the blueprint's audit), so
+# "collaboration" here is scoped to what's buildable without inventing one: a
+# secret per-trip link that lets a travel companion view the read-only plan,
+# nothing more (no bookings, no budget, no documents — those stay private to
+# whoever has the app open).
+
+@app.post("/api/trips/{trip_id}/share", response_model=ShareLinkResponse)
+def create_share_link(trip_id: str, db: Session = Depends(get_db)):
+    trip = _get_trip_or_404(trip_id, db)
+    if not trip.share_token:
+        trip.share_token = secrets.token_urlsafe(16)
+        db.commit()
+        db.refresh(trip)
+    return ShareLinkResponse(share_token=trip.share_token)
+
+
+@app.delete("/api/trips/{trip_id}/share", status_code=204)
+def revoke_share_link(trip_id: str, db: Session = Depends(get_db)):
+    trip = _get_trip_or_404(trip_id, db)
+    trip.share_token = None
+    db.commit()
+
+
+@app.get("/api/public/trips/{share_token}", response_model=PublicTripView)
+def get_shared_trip(share_token: str, db: Session = Depends(get_db)):
+    trip = db.query(Trip).filter(Trip.share_token == share_token).first()
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Shared trip not found")
+    return trip

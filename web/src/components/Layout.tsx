@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
+import OfflineBanner from "./OfflineBanner";
 
 interface NavItem {
   label: string;
@@ -62,6 +63,7 @@ export default function Layout() {
         <NavSection title="AI Engineering Workspace" items={aiNav} />
       </aside>
       <main className="flex-1 overflow-y-auto">
+        <OfflineBanner />
         <div className="mx-auto max-w-6xl px-8 py-8">
           <Outlet />
         </div>

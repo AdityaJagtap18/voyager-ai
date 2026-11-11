@@ -12,8 +12,11 @@ import type {
   KnowledgeDocumentSummary,
   KnowledgeSearchResult,
   ModelInfo,
+  PublicTripView,
+  ShareLinkResponse,
   TripCreateRequest,
   TripDetail,
+  TripDocumentSummary,
   TripExpense,
   TripSummary,
   ExpenseCreateRequest,
@@ -29,11 +32,49 @@ export class ApiError extends Error {
   }
 }
 
+// Offline support (Phase 4, remaining scope): cache every successful GET's
+// JSON in localStorage, and fall back to that cache if the network request
+// itself fails (not an HTTP error — a real connectivity failure, e.g. the
+// browser is offline). Lets My Trips / Trip Detail still show the last-known
+// data instead of a blank error screen while offline; it's stale-but-present
+// data, not a full offline-write queue (there's nothing to sync back once
+// reconnected, since nothing was written while offline).
+const CACHE_PREFIX = "voyager_cache:";
+
+function cacheGet<T>(path: string): T | null {
+  try {
+    const raw = localStorage.getItem(CACHE_PREFIX + path);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSet(path: string, data: unknown) {
+  try {
+    localStorage.setItem(CACHE_PREFIX + path, JSON.stringify(data));
+  } catch {
+    // localStorage unavailable/full — caching is a convenience, never fatal.
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  const isGet = !init?.method || init.method === "GET";
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      ...init,
+    });
+  } catch (networkError) {
+    if (isGet) {
+      const cached = cacheGet<T>(path);
+      if (cached !== null) return cached;
+    }
+    throw networkError;
+  }
+
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new ApiError(res.status, body.detail ?? `Request failed: ${res.status}`);
@@ -41,7 +82,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 204) {
     return undefined as T;
   }
-  return res.json() as Promise<T>;
+  const data = (await res.json()) as T;
+  if (isGet) cacheSet(path, data);
+  return data;
 }
 
 export const api = {
@@ -90,4 +133,25 @@ export const api = {
   scanText: (text: string) =>
     request<GuardrailScanResult>("/api/guardrails/scan", { method: "POST", body: JSON.stringify({ text }) }),
   listGuardrailEvents: () => request<GuardrailEventSummary[]>("/api/guardrails/events"),
+
+  listTripDocuments: (tripId: string) => request<TripDocumentSummary[]>(`/api/trips/${tripId}/documents`),
+  uploadTripDocument: async (tripId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`${BASE_URL}/api/trips/${tripId}/documents`, { method: "POST", body: formData });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(res.status, body.detail ?? `Request failed: ${res.status}`);
+    }
+    return res.json() as Promise<TripDocumentSummary>;
+  },
+  tripDocumentDownloadUrl: (tripId: string, documentId: string) =>
+    `${BASE_URL}/api/trips/${tripId}/documents/${documentId}/download`,
+  deleteTripDocument: (tripId: string, documentId: string) =>
+    request<void>(`/api/trips/${tripId}/documents/${documentId}`, { method: "DELETE" }),
+
+  createShareLink: (tripId: string) =>
+    request<ShareLinkResponse>(`/api/trips/${tripId}/share`, { method: "POST" }),
+  revokeShareLink: (tripId: string) => request<void>(`/api/trips/${tripId}/share`, { method: "DELETE" }),
+  getSharedTrip: (shareToken: string) => request<PublicTripView>(`/api/public/trips/${shareToken}`),
 };
