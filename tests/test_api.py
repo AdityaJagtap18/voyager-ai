@@ -131,3 +131,87 @@ def test_create_trip_records_workflow_failure(monkeypatch):
 def test_get_unknown_trip_returns_404():
     resp = client.get("/api/trips/does-not-exist")
     assert resp.status_code == 404
+
+
+def _create_test_trip() -> str:
+    """Insert a trip directly (bypassing the workflow) for bookings/expenses tests."""
+    db = TestingSessionLocal()
+    trip = api_module.Trip(destination="Goa, India", days=3, trip_type="foodie", budget="mid-range", status="complete")
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    trip_id = trip.id
+    db.close()
+    return trip_id
+
+
+def test_set_trip_budget():
+    trip_id = _create_test_trip()
+    resp = client.patch(f"/api/trips/{trip_id}", json={"budget_amount": 50000})
+    assert resp.status_code == 200
+    assert resp.json()["budget_amount"] == 50000
+
+
+def test_booking_crud_lifecycle():
+    trip_id = _create_test_trip()
+
+    create_resp = client.post(f"/api/trips/{trip_id}/bookings", json={
+        "type": "flight",
+        "title": "BOM -> GOI",
+        "reference": "6E123",
+        "cost": 4500,
+    })
+    assert create_resp.status_code == 201
+    booking = create_resp.json()
+    assert booking["status"] == "pending"
+    booking_id = booking["id"]
+
+    list_resp = client.get(f"/api/trips/{trip_id}/bookings")
+    assert len(list_resp.json()) == 1
+
+    confirm_resp = client.patch(f"/api/trips/{trip_id}/bookings/{booking_id}", json={"status": "confirmed"})
+    assert confirm_resp.status_code == 200
+    assert confirm_resp.json()["status"] == "confirmed"
+
+    delete_resp = client.delete(f"/api/trips/{trip_id}/bookings/{booking_id}")
+    assert delete_resp.status_code == 204
+    assert client.get(f"/api/trips/{trip_id}/bookings").json() == []
+
+
+def test_booking_rejects_invalid_type():
+    trip_id = _create_test_trip()
+    resp = client.post(f"/api/trips/{trip_id}/bookings", json={"type": "spaceship", "title": "Mars"})
+    assert resp.status_code == 422
+
+
+def test_expense_crud_lifecycle():
+    trip_id = _create_test_trip()
+
+    create_resp = client.post(f"/api/trips/{trip_id}/expenses", json={
+        "category": "food",
+        "description": "Beach shack dinner",
+        "amount": 1200,
+    })
+    assert create_resp.status_code == 201
+    expense_id = create_resp.json()["id"]
+
+    list_resp = client.get(f"/api/trips/{trip_id}/expenses")
+    assert len(list_resp.json()) == 1
+    assert list_resp.json()[0]["amount"] == 1200
+
+    delete_resp = client.delete(f"/api/trips/{trip_id}/expenses/{expense_id}")
+    assert delete_resp.status_code == 204
+    assert client.get(f"/api/trips/{trip_id}/expenses").json() == []
+
+
+def test_expense_rejects_invalid_category():
+    trip_id = _create_test_trip()
+    resp = client.post(f"/api/trips/{trip_id}/expenses", json={"category": "bribes", "amount": 100})
+    assert resp.status_code == 422
+
+
+def test_bookings_and_expenses_404_for_unknown_trip():
+    assert client.get("/api/trips/nope/bookings").status_code == 404
+    assert client.post("/api/trips/nope/bookings", json={"type": "flight", "title": "x"}).status_code == 404
+    assert client.get("/api/trips/nope/expenses").status_code == 404
+    assert client.post("/api/trips/nope/expenses", json={"category": "food", "amount": 1}).status_code == 404

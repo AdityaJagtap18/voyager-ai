@@ -26,8 +26,25 @@ if _APP_DIR not in sys.path:
 
 from app.config import Config  # noqa: E402
 from app.db import get_db, init_db  # noqa: E402
+from app.models_db import Booking as BookingModel  # noqa: E402
+from app.models_db import Expense as ExpenseModel  # noqa: E402
 from app.models_db import Trip  # noqa: E402
-from app.schemas import BUDGET_LEVELS, TRIP_TYPES, TripCreateRequest, TripDetail, TripSummary  # noqa: E402
+from app.schemas import (  # noqa: E402
+    BOOKING_STATUSES,
+    BOOKING_TYPES,
+    BUDGET_LEVELS,
+    EXPENSE_CATEGORIES,
+    TRIP_TYPES,
+    Booking,
+    BookingCreateRequest,
+    BookingStatusUpdate,
+    Expense,
+    ExpenseCreateRequest,
+    TripBudgetUpdate,
+    TripCreateRequest,
+    TripDetail,
+    TripSummary,
+)
 from app.workflow import create_workflow  # noqa: E402
 
 @asynccontextmanager
@@ -123,3 +140,95 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(trip)
     return trip
+
+
+def _get_trip_or_404(trip_id: str, db: Session) -> Trip:
+    trip = db.get(Trip, trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    return trip
+
+
+@app.patch("/api/trips/{trip_id}", response_model=TripDetail)
+def update_trip_budget(trip_id: str, payload: TripBudgetUpdate, db: Session = Depends(get_db)):
+    trip = _get_trip_or_404(trip_id, db)
+    trip.budget_amount = payload.budget_amount
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+# --- Bookings & Wallet (Phase 4) -------------------------------------------------
+# User-entered booking records (flight/hotel references, confirmations) — not a
+# live booking integration. Real provider bookings are Phase 3's "booking handoff"
+# and later a Level 3 authorized direct booking; this is the wallet that holds them.
+
+@app.get("/api/trips/{trip_id}/bookings", response_model=List[Booking])
+def list_bookings(trip_id: str, db: Session = Depends(get_db)):
+    _get_trip_or_404(trip_id, db)
+    return db.query(BookingModel).filter(BookingModel.trip_id == trip_id).order_by(BookingModel.created_at.desc()).all()
+
+
+@app.post("/api/trips/{trip_id}/bookings", response_model=Booking, status_code=201)
+def create_booking(trip_id: str, payload: BookingCreateRequest, db: Session = Depends(get_db)):
+    _get_trip_or_404(trip_id, db)
+    if payload.type not in BOOKING_TYPES:
+        raise HTTPException(status_code=422, detail=f"type must be one of {BOOKING_TYPES}")
+
+    booking = BookingModel(trip_id=trip_id, **payload.model_dump())
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@app.patch("/api/trips/{trip_id}/bookings/{booking_id}", response_model=Booking)
+def update_booking_status(trip_id: str, booking_id: str, payload: BookingStatusUpdate, db: Session = Depends(get_db)):
+    if payload.status not in BOOKING_STATUSES:
+        raise HTTPException(status_code=422, detail=f"status must be one of {BOOKING_STATUSES}")
+    booking = db.get(BookingModel, booking_id)
+    if booking is None or booking.trip_id != trip_id:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    booking.status = payload.status
+    db.commit()
+    db.refresh(booking)
+    return booking
+
+
+@app.delete("/api/trips/{trip_id}/bookings/{booking_id}", status_code=204)
+def delete_booking(trip_id: str, booking_id: str, db: Session = Depends(get_db)):
+    booking = db.get(BookingModel, booking_id)
+    if booking is None or booking.trip_id != trip_id:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    db.delete(booking)
+    db.commit()
+
+
+# --- Budget & Expenses (Phase 4) ------------------------------------------------
+
+@app.get("/api/trips/{trip_id}/expenses", response_model=List[Expense])
+def list_expenses(trip_id: str, db: Session = Depends(get_db)):
+    _get_trip_or_404(trip_id, db)
+    return db.query(ExpenseModel).filter(ExpenseModel.trip_id == trip_id).order_by(ExpenseModel.created_at.desc()).all()
+
+
+@app.post("/api/trips/{trip_id}/expenses", response_model=Expense, status_code=201)
+def create_expense(trip_id: str, payload: ExpenseCreateRequest, db: Session = Depends(get_db)):
+    _get_trip_or_404(trip_id, db)
+    if payload.category not in EXPENSE_CATEGORIES:
+        raise HTTPException(status_code=422, detail=f"category must be one of {EXPENSE_CATEGORIES}")
+
+    expense = ExpenseModel(trip_id=trip_id, **payload.model_dump())
+    db.add(expense)
+    db.commit()
+    db.refresh(expense)
+    return expense
+
+
+@app.delete("/api/trips/{trip_id}/expenses/{expense_id}", status_code=204)
+def delete_expense(trip_id: str, expense_id: str, db: Session = Depends(get_db)):
+    expense = db.get(ExpenseModel, expense_id)
+    if expense is None or expense.trip_id != trip_id:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    db.delete(expense)
+    db.commit()

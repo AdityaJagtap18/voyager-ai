@@ -1,23 +1,30 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import TripBookings from "../components/TripBookings";
+import TripBudget from "../components/TripBudget";
 import type { TripDetail as TripDetailType } from "../types";
 
-type Tab = "itinerary" | "restaurants" | "accommodations";
+type Tab = "itinerary" | "restaurants" | "accommodations" | "bookings" | "budget";
 
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab") as Tab | null;
   const [trip, setTrip] = useState<TripDetailType | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("itinerary");
+  const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
 
   useEffect(() => {
     if (!id) return;
     api
       .getTrip(id)
-      .then(setTrip)
+      .then((t) => {
+        setTrip(t);
+        if (!t.plan && !requestedTab) setTab("bookings");
+      })
       .catch((e) => setError(e.message));
-  }, [id]);
+  }, [id, requestedTab]);
 
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
   if (!trip) return <p className="text-sm text-ink-500">Loading…</p>;
@@ -55,10 +62,13 @@ export default function TripDetail() {
         </div>
       )}
 
-      {trip.status === "complete" && trip.plan && (
+      {trip.status !== "planning" && (
         <>
           <div className="mb-4 flex gap-2 border-b border-ink-900/10">
-            {(["itinerary", "restaurants", "accommodations"] as Tab[]).map((t) => (
+            {(trip.plan
+              ? (["itinerary", "restaurants", "accommodations", "bookings", "budget"] as Tab[])
+              : (["bookings", "budget"] as Tab[])
+            ).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -66,12 +76,15 @@ export default function TripDetail() {
                   tab === t ? "border-brand-600 text-brand-700" : "border-transparent text-ink-500 hover:text-ink-900"
                 }`}
               >
-                {t}
+                {t === "bookings" ? "Bookings & Wallet" : t === "budget" ? "Budget & Expenses" : t}
               </button>
             ))}
           </div>
 
-          {tab === "itinerary" && (
+          {tab === "bookings" && <TripBookings tripId={trip.id} />}
+          {tab === "budget" && <TripBudget tripId={trip.id} budgetAmount={trip.budget_amount} />}
+
+          {tab === "itinerary" && trip.plan && (
             <div className="flex flex-col gap-4">
               {trip.plan.itinerary?.itinerary?.map((day) => (
                 <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white p-5">
@@ -95,7 +108,7 @@ export default function TripDetail() {
             </div>
           )}
 
-          {tab === "restaurants" && (
+          {tab === "restaurants" && trip.plan && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {trip.plan.restaurants.map((r, i) => (
                 <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
@@ -108,7 +121,7 @@ export default function TripDetail() {
             </div>
           )}
 
-          {tab === "accommodations" && (
+          {tab === "accommodations" && trip.plan && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {trip.plan.accommodations.map((a, i) => (
                 <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">

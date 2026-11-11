@@ -90,6 +90,7 @@ export interface TripDetail extends TripSummary {
   dietary_preferences: string[];
   plan: TripPlan | null;
   errors: string[];
+  budget_amount: number | null;
 }
 
 export interface TripCreateRequest {
@@ -98,4 +99,51 @@ export interface TripCreateRequest {
   trip_type: string;
   budget: string;
   dietary_preferences: string[];
+}
+
+export const BOOKING_TYPES = ["flight", "hotel", "activity", "other"] as const;
+export const BOOKING_STATUSES = ["pending", "confirmed", "cancelled"] as const;
+export const EXPENSE_CATEGORIES = [
+  "flights",
+  "accommodation",
+  "food",
+  "transport",
+  "activities",
+  "shopping",
+  "misc",
+] as const;
+
+export interface Booking {
+  id: string;
+  trip_id: string;
+  type: (typeof BOOKING_TYPES)[number];
+  title: string;
+  reference: string | null;
+  status: (typeof BOOKING_STATUSES)[number];
+  cost: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface BookingCreateRequest {
+  type: string;
+  title: string;
+  reference?: string;
+  cost?: number;
+  notes?: string;
+}
+
+export interface TripExpense {
+  id: string;
+  trip_id: string;
+  category: (typeof EXPENSE_CATEGORIES)[number];
+  description: string | null;
+  amount: number;
+  created_at: string;
+}
+
+export interface ExpenseCreateRequest {
+  category: string;
+  description?: string;
+  amount: number;
 }

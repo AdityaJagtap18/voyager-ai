@@ -4,6 +4,7 @@ import Home from "./pages/Home";
 import PlanTrip from "./pages/PlanTrip";
 import MyTrips from "./pages/MyTrips";
 import TripDetail from "./pages/TripDetail";
+import TripPickerHub from "./pages/TripPickerHub";
 import ComingSoon from "./pages/ComingSoon";
 
 export default function App() {
@@ -15,8 +16,26 @@ export default function App() {
         <Route path="/trips" element={<MyTrips />} />
         <Route path="/trips/:id" element={<TripDetail />} />
 
-        <Route path="/bookings" element={<ComingSoon title="Bookings & Wallet" />} />
-        <Route path="/budget" element={<ComingSoon title="Budget & Expenses" />} />
+        <Route
+          path="/bookings"
+          element={
+            <TripPickerHub
+              title="Bookings & Wallet"
+              description="Flight/hotel references, confirmation status and costs, per trip."
+              tab="bookings"
+            />
+          }
+        />
+        <Route
+          path="/budget"
+          element={
+            <TripPickerHub
+              title="Budget & Expenses"
+              description="Set a budget target and track spending against it, per trip."
+              tab="budget"
+            />
+          }
+        />
         <Route path="/group-trips" element={<ComingSoon title="Group Trips" />} />
         <Route path="/companion" element={<ComingSoon title="Travel Companion" />} />
 

@@ -74,6 +74,8 @@ app/data/itineraries/*.json
 # Frontend (Phase 2)
 web/node_modules/
 web/dist/
+web/*.tsbuildinfo
+web/.env.local
 
 # Jupyter Notebooks
 .ipynb_checkpoints

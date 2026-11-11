@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 TRIP_TYPES = ["historic", "adventure", "relaxation", "foodie", "cultural", "romantic", "nature"]
 BUDGET_LEVELS = ["budget", "mid-range", "premium"]
+BOOKING_TYPES = ["flight", "hotel", "activity", "other"]
+BOOKING_STATUSES = ["pending", "confirmed", "cancelled"]
+EXPENSE_CATEGORIES = ["flights", "accommodation", "food", "transport", "activities", "shopping", "misc"]
 
 
 class TripCreateRequest(BaseModel):
@@ -32,3 +35,51 @@ class TripDetail(TripSummary):
     dietary_preferences: List[str]
     plan: Optional[Dict[str, Any]] = None
     errors: List[str] = Field(default_factory=list)
+    budget_amount: Optional[float] = None
+
+
+class TripBudgetUpdate(BaseModel):
+    budget_amount: float = Field(..., ge=0)
+
+
+class BookingCreateRequest(BaseModel):
+    type: str
+    title: str = Field(..., min_length=1, max_length=255)
+    reference: Optional[str] = Field(None, max_length=100)
+    cost: Optional[float] = Field(None, ge=0)
+    notes: Optional[str] = Field(None, max_length=2000)
+
+
+class BookingStatusUpdate(BaseModel):
+    status: str
+
+
+class Booking(BaseModel):
+    id: str
+    trip_id: str
+    type: str
+    title: str
+    reference: Optional[str]
+    status: str
+    cost: Optional[float]
+    notes: Optional[str]
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExpenseCreateRequest(BaseModel):
+    category: str
+    description: Optional[str] = Field(None, max_length=255)
+    amount: float = Field(..., gt=0)
+
+
+class Expense(BaseModel):
+    id: str
+    trip_id: str
+    category: str
+    description: Optional[str]
+    amount: float
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)

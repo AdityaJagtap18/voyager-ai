@@ -131,7 +131,7 @@ Each phase below is sized to be independently committable and testable. Phases 0
 | 1 | Architecture foundation: fix config side-effects, add `.env.example`, pytest scaffold, CI skeleton | **COMPLETE** | Phase 0 | none |
 | 2 | FastAPI backend wrapping existing workflow + persistence (Postgres/SQLite) + React frontend using the existing SVG library and UI reference images | **COMPLETE** | Phase 1 | none |
 | 3 | Real travel providers (flights/hotels/weather/maps) replacing GPT-generated placeholder data | NOT STARTED | Phase 2 | provider API keys (Amadeus, etc.) |
-| 4 | Trip management: bookings/wallet, expenses, documents, collaboration | NOT STARTED | Phase 3 | none |
+| 4 | Trip management: bookings/wallet, expenses | **COMPLETE (partial — see notes)** | Phase 2 | none |
 | 5 | Model gateway (LiteLLM), provider-agnostic routing | NOT STARTED | Phase 1 | optional provider keys (Ollama needs none) |
 | 6 | Agent framework adapters (CrewAI/AutoGen alongside LangGraph), Agent Studio | NOT STARTED | Phase 5 | none |
 | 7 | RAG + MCP | NOT STARTED | Phase 5 | none |
@@ -184,6 +184,22 @@ A phase is complete when: code compiles/runs, relevant tests pass (fixtures used
 
 **Not done in Phase 2** (explicitly out of scope per Section 5): real flight/hotel/weather/maps provider data (Phase 3), budget tracking, group collaboration, bookings/wallet (Phase 4), and all AI Engineering Workspace functionality (Phases 5–9). The quick-link tiles on Home (Flights/Hotels/Weather/Maps) are visual only and not wired to anything yet — they reuse the reference design's layout but have no destination pages until Phase 3.
 
+## 10. Phase 4 Delivery Notes
+
+Scoped down from the brief's full Phase 4 (which also lists documents, collaboration, and offline support) to what's buildable without new infrastructure (multi-user auth, file storage) this pass: **Bookings & Wallet** and **Budget & Expenses**, both per-trip. Documents, group collaboration, and offline support remain future work — not silently dropped, just not in this increment.
+
+**Backend** (`app/models_db.py`, `app/schemas.py`, `app/api.py`):
+- New `Booking` model (type, title, reference, status, cost, notes) and `Expense` model (category, description, amount), both `trip_id`-scoped. `Trip` gets a new `budget_amount` column — a user-set numeric target, kept separate from the existing `budget` level string (budget/mid-range/premium) that only steers what the agents recommend.
+- Endpoints: `PATCH /api/trips/{id}` (set budget_amount), full CRUD-minus-update on bookings (`GET`/`POST`/`PATCH` status/`DELETE`) and expenses (`GET`/`POST`/`DELETE`), all 404 on an unknown trip and 422 on an invalid type/category/status.
+- These are **user-entered wallet records, not a live booking integration** — there's no provider to book against yet (that's Phase 3's "booking handoff" / Level 2-3). This is the ledger that will eventually hold real confirmations.
+- 12 new tests (23 total now pass).
+
+**Frontend**:
+- Trip Detail gained two tabs — "Bookings & Wallet" (`web/src/components/TripBookings.tsx`: add a booking, change its status inline, remove it) and "Budget & Expenses" (`web/src/components/TripBudget.tsx`: set a budget target, log expenses by category, a progress bar that turns red and labels itself "over budget" past the target). Both tabs are available even when trip planning failed or has no `plan` yet — bookings/budget are useful independent of whether the AI itinerary succeeded.
+- The sidebar's "Bookings & Wallet" and "Budget & Expenses" items (previously "coming soon" placeholders) now route to `web/src/pages/TripPickerHub.tsx`, a simple trip picker that deep-links into the right tab (`/trips/{id}?tab=bookings`) — because these are per-trip features, not a single global ledger, and a real cross-trip aggregate view wasn't in scope for this pass.
+- Verified end-to-end live in the browser: added a flight booking, changed its status pending → confirmed, set a ₹100,000 budget, logged a ₹120,000 expense and confirmed the "over budget" state renders, and confirmed the sidebar hub page deep-links correctly into the trip's Bookings tab.
+- Caught and fixed a real bug during this verification: the backend's `CORS_ORIGINS` default only allowed port 5173, so a dev server on a different port (5174, e.g. when 5173 was already in use) got silently blocked by CORS with no obvious error in the UI. Documented here rather than silently worked around, since it'll resurface for anyone running two frontends locally — set `CORS_ORIGINS` explicitly in that case.
+
 ## Next step
 
-Phases 0–2 are complete and committed. Phase 3 (real travel providers — flights, hotels, weather, maps replacing the GPT-generated placeholder data) needs provider credentials (Amadeus, etc.) that only the user can supply; Phase 4 (bookings/wallet/budget/collaboration) and Phase 5 (model gateway) don't have that blocker and could go next. Recommend picking one explicitly rather than continuing to the next phase number by default, since the remaining phases are no longer small.
+Phases 0, 1, 2, and 4 (partial) are complete and committed. Phase 3 (real travel providers — flights, hotels, weather, maps replacing the GPT-generated placeholder data) needs provider credentials (Amadeus, etc.) that only the user can supply. Remaining Phase 4 scope (documents, group collaboration, offline support) and Phase 5 (model gateway) don't have that blocker. Recommend picking one explicitly rather than continuing to the next phase number by default, since the remaining phases are no longer small.
