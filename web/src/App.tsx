@@ -10,6 +10,7 @@ import ModelsRouting from "./pages/ModelsRouting";
 import AgentStudio from "./pages/AgentStudio";
 import RagKnowledge from "./pages/RagKnowledge";
 import Observability from "./pages/Observability";
+import Workflows from "./pages/Workflows";
 import Evaluations from "./pages/Evaluations";
 import SecurityLab from "./pages/SecurityLab";
 import SharedTrip from "./pages/SharedTrip";
@@ -62,7 +63,7 @@ export default function App() {
         <Route path="/ai/agent-studio" element={<AgentStudio />} />
         <Route path="/ai/models" element={<ModelsRouting />} />
         <Route path="/ai/rag" element={<RagKnowledge />} />
-        <Route path="/ai/workflows" element={<ComingSoon title="Workflows" />} />
+        <Route path="/ai/workflows" element={<Workflows />} />
         <Route path="/ai/observability" element={<Observability />} />
         <Route path="/ai/evaluations" element={<Evaluations />} />
         <Route path="/ai/security" element={<SecurityLab />} />

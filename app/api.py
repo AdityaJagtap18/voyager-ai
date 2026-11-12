@@ -45,6 +45,8 @@ from llm_gateway import MODEL_REGISTRY, is_configured, resolve_model  # noqa: E4
 from orchestration import (  # noqa: E402
     AGENT_CATALOG,
     FRAMEWORK_REGISTRY,
+    PIPELINE_EDGES,
+    PIPELINE_STEPS,
     build_orchestrator,
     is_available as is_framework_available,
     resolve_framework,
@@ -100,6 +102,8 @@ from app.schemas import (  # noqa: E402
     TripDocumentSummary,
     TripSummary,
     WeatherForecastResponse,
+    WorkflowStep,
+    WorkflowsResponse,
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 from agents.itinerary_agent import ItineraryAgent  # noqa: E402
@@ -211,6 +215,21 @@ def list_frameworks():
 @app.get("/api/agents", response_model=List[AgentInfoResponse])
 def list_agents():
     return [AgentInfoResponse(**agent) for agent in AGENT_CATALOG]
+
+
+@app.get("/api/workflows", response_model=WorkflowsResponse)
+def get_workflows():
+    """The real planning pipeline's topology (Phase 11j) - the actual node/
+    edge sequence both orchestration frameworks run (see PIPELINE_STEPS'
+    docstring in app/orchestration/__init__.py), not a separate diagram."""
+    return WorkflowsResponse(
+        frameworks=[
+            FrameworkInfoResponse(id=f.id, label=f.label, description=f.description, available=f.available)
+            for f in FRAMEWORK_REGISTRY.values()
+        ],
+        steps=[WorkflowStep(**step) for step in PIPELINE_STEPS],
+        edges=PIPELINE_EDGES,
+    )
 
 
 # --- RAG Knowledge Base (Phase 7) -----------------------------------------------

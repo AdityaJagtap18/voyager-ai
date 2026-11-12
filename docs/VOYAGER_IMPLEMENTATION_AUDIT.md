@@ -728,3 +728,43 @@ real Mumbai trip: clicking the button re-tried all three providers and correctly
 refreshed, since ORS geocoding, Booking.com hotels, and (newly discovered in this same test) the
 flights-sky API have all hit their monthly quotas right now - confirmed from the backend log, thanks to
 the logging fix above, rather than being a silent guess.
+
+## Workflows UI (Phase 11k)
+
+The "Workflows" nav item under AI Engineering was flagged in this audit's own earlier pass as an
+honest stub: "the LangGraph pipeline itself is real and runs on every trip; there's just no dedicated
+UI for it." Built that UI - not a diagram editor or a separate workflow builder (nothing like that
+exists or was asked for), but a real, data-grounded view of the pipeline that actually runs.
+
+**The topology is not invented**: `PIPELINE_STEPS`/`PIPELINE_EDGES` (new, in `app/orchestration/
+__init__.py`) are transcribed directly from the real node/edge wiring in `app/workflow.py`'s
+`StateGraph` (`add_node`/`add_edge` calls) and the identical `tasks=[...]` sequence in
+`orchestration/crewai_adapter.py`'s `Crew` - both orchestrators run the exact same six-step sequence
+today (research → flights → accommodation → transportation → dining → itinerary), verified against
+both files rather than assumed. `AGENT_CATALOG` (used by Agent Studio) was left untouched since it
+predates the flights/transportation steps and serves a different, narrower purpose there; this is a
+separate, current definition rather than a patch to a roster that four other things already depend on.
+
+**API**: `GET /api/workflows` returns the framework registry (same data `/api/frameworks` serves),
+the six pipeline steps (each with its real implementing agent/module and whether it always runs or is
+conditional - flights and transportation both legitimately skip without the right inputs, per their
+own existing "never fabricate" design), and the edge list. One new test asserting the exact step/edge
+sequence and that `flights.always_runs` is `False`.
+
+**Frontend**: `Workflows.tsx` renders the pipeline as a vertical flowchart (step cards connected by
+arrows), with a dropdown to overlay a real trip's `trace` on top of it - each step shows "ran · N ms",
+"skipped", or "error" instead of the static "Always runs"/"Conditional" badge once a trip is selected,
+by matching trace entries to step ids (a `refresh-real-data` trace entry like `"flights_refresh"` has a
+different id, so it never collides with the original plan's `"flights"` entry). This is deliberately a
+different view from the pre-existing Observability page: Observability is a per-run timeline/list of
+what happened; Workflows is the pipeline's shape, with a real run's outcome optionally laid over it.
+
+Live-verified: loaded with no trips filtered out, auto-selected the real Mumbai trip, and correctly
+showed Research/Accommodation/Dining/Itinerary as "ran" with real durations, Transportation as
+"skipped", and Flights as "ran" (the quota had briefly recovered by the time of this check) - then
+switched the overlay to "None" and confirmed it cleanly falls back to the static Always-runs/
+Conditional badges.
+
+**Explicitly out of scope**: an actual workflow *builder* (dragging/editing nodes, saving custom
+pipelines) - nothing in the blueprint or this request asked for one, and the real pipeline isn't
+user-configurable today, so a builder UI would have nothing real to edit.

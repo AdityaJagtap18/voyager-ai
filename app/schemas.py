@@ -109,6 +109,20 @@ class AgentInfoResponse(BaseModel):
     data_source: str
 
 
+class WorkflowStep(BaseModel):
+    id: str
+    label: str
+    agent: str
+    description: str
+    always_runs: bool
+
+
+class WorkflowsResponse(BaseModel):
+    frameworks: List[FrameworkInfoResponse]
+    steps: List[WorkflowStep]
+    edges: List[List[str]]
+
+
 class TripBudgetUpdate(BaseModel):
     budget_amount: float = Field(..., ge=0)
 

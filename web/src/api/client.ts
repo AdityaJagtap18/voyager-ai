@@ -28,6 +28,7 @@ import type {
   TripSummary,
   ExpenseCreateRequest,
   WeatherForecast,
+  WorkflowsResponse,
 } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
@@ -110,6 +111,7 @@ export const api = {
   listModels: () => request<ModelInfo[]>("/api/models"),
   listFrameworks: () => request<FrameworkInfo[]>("/api/frameworks"),
   listAgents: () => request<AgentInfo[]>("/api/agents"),
+  getWorkflows: () => request<WorkflowsResponse>("/api/workflows"),
   listTrips: () => request<TripSummary[]>("/api/trips"),
   getTrip: (id: string) => request<TripDetail>(`/api/trips/${id}`),
   createTrip: (payload: TripCreateRequest) =>

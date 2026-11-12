@@ -89,6 +89,67 @@ AGENT_CATALOG = [
 ]
 
 
+# The real pipeline topology (Phase 11j: Workflows UI), straight from the
+# actual node/edge wiring in app/workflow.py's StateGraph and the identical
+# `tasks=[...]` sequence in orchestration/crewai_adapter.py's Crew — not a
+# separate/idealized diagram. Both frameworks run this exact same sequence
+# today (verified against both files), so one definition covers either one;
+# if that ever changes, this needs to change with it rather than drift into
+# a diagram that no longer matches what actually runs.
+PIPELINE_STEPS = [
+    {
+        "id": "research",
+        "label": "Research",
+        "agent": "ResearchAgent",
+        "description": "Finds attractions matching the destination/trip type (LLM), then geocodes them for real.",
+        "always_runs": True,
+    },
+    {
+        "id": "flights",
+        "label": "Flights",
+        "agent": "services.flights_api",
+        "description": "Real flight search. Skipped (not an error) without both an origin and a start date; never fabricates an offer.",
+        "always_runs": False,
+    },
+    {
+        "id": "accommodation",
+        "label": "Accommodation",
+        "agent": "AccommodationAgent",
+        "description": "Real Booking.com listings when a start date is set and the provider has data, else LLM-suggested lodging - both ranked by real ORS distance to the attractions found above.",
+        "always_runs": True,
+    },
+    {
+        "id": "transportation",
+        "label": "Transportation",
+        "agent": "TransportAgent",
+        "description": "A real routed airport-to-accommodation driving transfer (ORS). Skipped without a best accommodation location to route to.",
+        "always_runs": False,
+    },
+    {
+        "id": "dining",
+        "label": "Dining",
+        "agent": "DiningAgent",
+        "description": "LLM-suggested restaurants honoring dietary preferences, ranked by real ORS distance to the accommodation.",
+        "always_runs": True,
+    },
+    {
+        "id": "itinerary",
+        "label": "Itinerary",
+        "agent": "ItineraryAgent",
+        "description": "Deterministic day-by-day schedule - real geocoding, distance matrices, and route optimization, not LLM-generated.",
+        "always_runs": True,
+    },
+]
+
+PIPELINE_EDGES = [
+    ["research", "flights"],
+    ["flights", "accommodation"],
+    ["accommodation", "transportation"],
+    ["transportation", "dining"],
+    ["dining", "itinerary"],
+]
+
+
 def resolve_framework(framework_id: Optional[str]) -> str:
     """Pick the framework to actually use: the requested one if known, else the default."""
     if framework_id and framework_id in FRAMEWORK_REGISTRY:

@@ -403,6 +403,27 @@ def test_list_agents_reports_four_agent_roster():
     assert {a["id"] for a in agents} == {"research", "accommodation", "dining", "itinerary"}
 
 
+def test_get_workflows_reports_full_six_step_pipeline():
+    resp = client.get("/api/workflows")
+    assert resp.status_code == 200
+    body = resp.json()
+    by_id = {f["id"]: f for f in body["frameworks"]}
+    assert by_id["langgraph"]["available"] is True
+    assert "crewai" in by_id
+
+    step_ids = [s["id"] for s in body["steps"]]
+    assert step_ids == ["research", "flights", "accommodation", "transportation", "dining", "itinerary"]
+    assert body["edges"] == [
+        ["research", "flights"],
+        ["flights", "accommodation"],
+        ["accommodation", "transportation"],
+        ["transportation", "dining"],
+        ["dining", "itinerary"],
+    ]
+    flights_step = next(s for s in body["steps"] if s["id"] == "flights")
+    assert flights_step["always_runs"] is False
+
+
 def test_create_trip_rejects_unknown_framework(monkeypatch):
     monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
     resp = client.post("/api/trips", json={

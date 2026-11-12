@@ -222,8 +222,22 @@ export interface TripPlan {
 export interface TraceEntry {
   step: string;
   duration_ms: number;
-  status: "success" | "error";
+  status: "success" | "error" | "skipped";
   error?: string;
+}
+
+export interface WorkflowStep {
+  id: string;
+  label: string;
+  agent: string;
+  description: string;
+  always_runs: boolean;
+}
+
+export interface WorkflowsResponse {
+  frameworks: FrameworkInfo[];
+  steps: WorkflowStep[];
+  edges: [string, string][];
 }
 
 export interface TripDetail extends TripSummary {
