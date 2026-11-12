@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import { BUDGET_LEVELS, TRIP_TYPES, type FrameworkInfo, type ModelInfo } from "../types";
 
 export default function PlanTrip() {
   const navigate = useNavigate();
-  const [destination, setDestination] = useState("");
+  const [searchParams] = useSearchParams();
+  const [destination, setDestination] = useState(() => searchParams.get("destination") ?? "");
   const [days, setDays] = useState(3);
   const [tripType, setTripType] = useState<string>(TRIP_TYPES[0]);
   const [budget, setBudget] = useState<string>("mid-range");

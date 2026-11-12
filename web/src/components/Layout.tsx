@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import OfflineBanner from "./OfflineBanner";
+import TopBar from "./TopBar";
 
 interface NavItem {
   label: string;
@@ -56,14 +57,18 @@ export default function Layout() {
     <div className="flex min-h-screen bg-surface">
       <aside className="w-64 shrink-0 border-r border-ink-900/5 bg-white px-3 py-5">
         <div className="mb-6 px-2">
-          <img src="/icons/Logos/voyager-wordmark.svg" alt="Voyager AI" className="h-9" />
-          <p className="px-0 text-xs text-ink-500">Travel &amp; AI Engineering Platform</p>
+          <div className="flex items-center gap-2">
+            <img src="/icons/Logos/voyager-mark.svg" alt="" className="h-7 w-7" aria-hidden="true" />
+            <img src="/icons/Logos/voyager-wordmark.svg" alt="Voyager AI" className="h-6" />
+          </div>
+          <p className="mt-0.5 px-0 text-xs text-ink-500">Travel &amp; AI Engineering Platform</p>
         </div>
         <NavSection title="Travel Workspace" items={travelNav} />
         <NavSection title="AI Engineering Workspace" items={aiNav} />
       </aside>
       <main className="flex-1 overflow-y-auto">
         <OfflineBanner />
+        <TopBar />
         <div className="mx-auto max-w-6xl px-8 py-8">
           <Outlet />
         </div>
