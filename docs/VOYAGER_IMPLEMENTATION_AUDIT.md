@@ -273,3 +273,38 @@ card (not counted in the total) and "₹5,700 committed of ₹20,000" with the �
 caption - confirmed via screenshot. This trip's real-hotel search fell back to the LLM path (no
 real accommodation offers found for this query), so the accommodation live-quote card correctly did
 not render rather than showing nothing or a fabricated placeholder.
+
+## Phase 10 (fourth slice) — My Trips command center: readiness, alerts, timeline
+
+Fourth slice of the expansion request. Re-reading the request's "My Trips command center" list
+against what already exists: flights/accommodation/transportation/restaurants/itinerary/bookings/
+budget tabs already exist per-trip on Trip Detail (built in earlier Phase 10 slices and before), and
+generic document upload (`TripDocuments.tsx`) already covers "upload external booking confirmations
+when sync unavailable" - any file, including a booking confirmation PDF, not booking-type-specific
+but functionally equivalent. What was actually missing was the cross-trip rollup: a readiness
+checklist, alerts, and a chronological timeline, all absent until now.
+
+**What was built** (`MyTrips.tsx`, `TripCard.tsx` - frontend only, no backend changes): fetches each
+trip's full detail + bookings + documents (same `Promise.all` pattern `Observability.tsx` already
+uses for its stat tiles) and computes, per trip, purely from data that's already real:
+
+- **Readiness checklist** (6 real checks, no fabricated scoring): itinerary planned, real flight
+  data found, accommodation chosen, budget target set, a booking confirmed, travel documents
+  attached. Shown as an "N/6 ready" badge on each `TripCard`.
+- **Alerts**: a trip starting within 14 real days with no confirmed booking, or no documents
+  attached, surfaces a plain-language alert; a trip whose planning actually failed (`status ===
+  "failed"`) surfaces too, linking to its real error. All derived from present/absent real data and
+  real date math - no predicted risk score, no invented urgency.
+- **Chronological timeline**: trips with a real `start_date` in the future, sorted soonest-first,
+  with the real date and a real day-count.
+
+**Live-verified**: loaded `/trips` with 6 existing real trips - the 5/6-ready trip (the one with a
+confirmed booking + logged expense from the earlier budget-rollup verification) and a 1/6-ready trip
+(no origin, so no real flights) both showed correct badges. Created a trip dated 6 days out with no
+booking/documents; the Alerts card correctly appeared with both expected messages, and the timeline
+correctly sorted it first. `tsc --noEmit` clean; 206 backend tests still pass (no backend changed).
+
+**Not built**: a live map or cross-trip calendar view (Maps page already exists per-trip, not
+aggregated); push-style notifications (no infra for that - these are rendered, not delivered,
+alerts). These would be reasonable follow-ons but weren't asked for as explicitly as the checklist/
+alerts/timeline were.

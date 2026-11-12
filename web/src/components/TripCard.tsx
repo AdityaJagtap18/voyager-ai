@@ -33,7 +33,14 @@ export function formatDateRange(startDate: string | null, days: number) {
   return `${start.toLocaleDateString(undefined, opts)} – ${end.toLocaleDateString(undefined, opts)}`;
 }
 
-export default function TripCard({ trip }: { trip: TripSummary }) {
+export default function TripCard({
+  trip,
+  readiness,
+}: {
+  trip: TripSummary;
+  /** Optional - how many of the real readiness checks (My Trips command center) this trip has met. */
+  readiness?: { done: number; total: number };
+}) {
   return (
     <Link
       to={`/trips/${trip.id}`}
@@ -53,6 +60,11 @@ export default function TripCard({ trip }: { trip: TripSummary }) {
         <p className="mt-1 text-sm text-ink-500">
           {formatDateRange(trip.start_date, trip.days)} · {trip.trip_type}
         </p>
+        {readiness && (
+          <p className="mt-2 text-xs font-medium text-ink-500">
+            {readiness.done}/{readiness.total} ready
+          </p>
+        )}
       </div>
     </Link>
   );

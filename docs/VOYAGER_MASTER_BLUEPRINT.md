@@ -490,6 +490,23 @@ separately, per screenshot.
 the violation), and per-traveler division (no traveler-count field on `Trip` yet - a separate,
 scoped addition).
 
+### Phase 10 (fourth slice) — My Trips command center: readiness, alerts, timeline
+
+Most of "My Trips command center"'s per-trip sections already existed (flights/accommodation/
+transportation/restaurants/itinerary/bookings/budget tabs, plus generic document upload already
+covering "upload confirmations when sync unavailable"). What was missing was the cross-trip
+rollup. `MyTrips.tsx` now fetches each trip's detail/bookings/documents (same `Promise.all` pattern
+`Observability.tsx` already used) and computes, purely from real data: a 6-check readiness badge
+per trip ("N/6 ready" on `TripCard`), real-date-driven alerts (starts within 14 days with no
+confirmed booking or no documents; planning actually failed), and a chronological timeline of
+upcoming trips. No predicted risk scores or invented urgency - everything is a present/absent check
+or real date math. Live-verified: existing trips' readiness badges matched expectations, and a
+newly created near-term trip correctly triggered both alert messages and sorted first in the
+timeline. `tsc --noEmit` clean; no backend changes, so all 206 tests still pass unchanged.
+
+**Not built**: a cross-trip map/calendar view, push notifications (these alerts render in-app, they
+aren't delivered) - reasonable follow-ons, but not what was explicitly asked for here.
+
 ## Next step
 
-Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first three slices (real flight grounding, real transportation discovery, labeled budget rollup) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, and the full My Trips command center — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
+Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first four slices (real flight grounding, real transportation discovery, labeled budget rollup, My Trips command center) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, and the unified trip proposal's independent-selection/recalculation architecture plus Level 3 direct booking — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
