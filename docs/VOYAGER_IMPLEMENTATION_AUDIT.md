@@ -867,18 +867,43 @@ restarted with the fresh key, a real trip ("Prague, Czechia") generated to produ
 checked for any LangSmith-side send failure - none appeared (LangChain's background tracer logs on
 failure rather than failing the request).
 
-**Phase 3 (Arize Phoenix) - architected, not live-verified**: deliberately never `pip install
-arize-phoenix` into this app's own venv - confirmed live that doing so drags in a `fastmcp`/
-`pydantic-ai` chain forcing `mcp>=2` (breaking `app/mcp_server.py`'s `mcp<2`-pinned `FastMCP` import)
-and `openai>=3` (breaking CrewAI's `openai<3` pin), to the point of breaking `pytest` collection
-itself via Phoenix's own auto-loaded pytest plugin. Recovered by fully uninstalling
-`arize-phoenix`/its sub-packages and reinstalling the pinned `openai`/`aiosqlite` versions (full suite
-back to passing, 336 tests). Resolved architecturally instead: Phoenix runs as its own container
-(`docker-compose.yml`'s new `phoenix` service, official image, no shared Python dependency graph),
-and `configure_observability()` only ever talks to it over plain OTLP/HTTP (a second
-`BatchSpanProcessor` on the same `TracerProvider`, gated behind `PHOENIX_ENABLED`) - no Phoenix Python
-package is imported anywhere in Voyager's own code. Not yet started/verified against a running
-container.
+**Phase 3 (Arize Phoenix) - Active, live-verified**: deliberately never `pip install arize-phoenix`
+into this app's own venv - confirmed live that doing so drags in a `fastmcp`/`pydantic-ai` chain
+forcing `mcp>=2` (breaking `app/mcp_server.py`'s `mcp<2`-pinned `FastMCP` import) and `openai>=3`
+(breaking CrewAI's `openai<3` pin), to the point of breaking `pytest` collection itself via Phoenix's
+own auto-loaded pytest plugin. Recovered by fully uninstalling `arize-phoenix`/its sub-packages and
+reinstalling the pinned `openai`/`aiosqlite` versions (full suite back to passing, 336 tests).
+Resolved architecturally instead: Phoenix runs as its own container (`docker-compose.yml`'s `phoenix`
+service, official image, no shared Python dependency graph), and `configure_observability()` only
+ever talks to it over plain OTLP/HTTP (a second `BatchSpanProcessor` on the same `TracerProvider`,
+gated behind `PHOENIX_ENABLED`) - no Phoenix Python package is imported anywhere in Voyager's own
+code.
+
+Two real issues surfaced getting the container actually running, both fixed: (1) the host port for
+Phoenix's OTLP/gRPC collector (4317) was already bound by an unrelated container on this machine -
+dropped that port mapping entirely since Voyager's exporter only ever speaks OTLP/HTTP, never gRPC;
+(2) the compose healthcheck used `curl`, which isn't in the official Phoenix image (it stayed
+"starting" forever even though the server was already serving 200s) - switched it to a Python
+one-liner, since Python is the one interpreter guaranteed present (Phoenix itself runs on it).
+
+More significantly: Phoenix 21.x enables its own login/auth by default, which also protects its OTLP
+ingestion endpoint - span export failed with `401 Unauthorized` until an API key was generated
+through the Phoenix UI (Settings > API Keys) and passed as an `Authorization: Bearer` header on the
+exporter (`Config.PHOENIX_API_KEY`, new in `app/config.py`; `_otlp_exporter()` in
+`app/observability/__init__.py` now accepts a `headers` dict). Logging into Phoenix's admin console
+itself required the user to do it by hand - entering credentials into even this local, single-user
+console was correctly refused by Claude Code's own safety classifier as credential entry, which is
+the right call generalized: a third-party tool's admin login isn't "the user's own application" just
+because it happens to run on localhost. The bootstrap admin account's email (`admin@localhost`) was
+recovered by reading Phoenix's own `users` table directly inside the container (`/root/.phoenix/
+phoenix.db` - note this path, not the `/mnt/data` volume mount, is where Phoenix's SQLite DB actually
+lives, so the compose volume doesn't currently persist it across container recreation) rather than
+guessing or attempting to disable auth (also correctly refused, as a security-weakening change).
+
+**Live-verified**: with the API key wired in and the backend restarted, a real trip ("Kyoto, Japan")
+produced 9 spans visible in Phoenix's Tracing view under the `default` project, including the root
+`POST /api/trips` span with its real latency (34.4s) - confirmed directly in the Phoenix UI by the
+user, not just inferred from an absence of logged errors.
 
 **Tests**: `tests/test_observability.py`, 12 new cases - span attributes/OK status, exception
 recording + re-raise + ERROR status, parent-child relationships and trace-id propagation through
@@ -891,9 +916,11 @@ returns `FAILURE`, never raises), and `configure_observability()` being a true n
 allowed") - so the fixture monkeypatches `app.observability.get_tracer` itself per test instead of
 touching the global provider.
 
-**Not yet done**: Phase 3's live Phoenix verification; Phase 4 (rebuilding the Observability UI
-against the new `Span` table - trace explorer, trace detail, per-agent/model/framework comparisons);
-Phase 5 (evaluation-framework integration); updating `docs/VOYAGER_TECH_STACK.md`'s own Observability
-section (done alongside this entry); the stale `docker-compose.yml` `voyager-ai` service still builds
-`streamlit run streamlit_app.py`, not the real FastAPI+Vite app - known from the Phase 0 audit,
-explicitly out of scope for this phase (the user chose "all three backends," not the Docker fix).
+**Not yet done**: Phase 4 (rebuilding the Observability UI against the new `Span` table - trace
+explorer, trace detail, per-agent/model/framework comparisons); Phase 5 (evaluation-framework
+integration); Phoenix's own trace persistence across container restarts (its SQLite DB lives at
+`/root/.phoenix/phoenix.db` inside the container, not under the `/mnt/data` volume mount - a real
+gap if the container is ever recreated, not fixed in this pass); the stale `docker-compose.yml`
+`voyager-ai` service still builds `streamlit run streamlit_app.py`, not the real FastAPI+Vite app -
+known from the Phase 0 audit, explicitly out of scope for this phase (the user chose "all three
+backends," not the Docker fix).

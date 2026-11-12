@@ -70,6 +70,12 @@ class Config:
     # a remote Phoenix's OTLP endpoint instead to use a non-local instance.
     PHOENIX_COLLECTOR_ENDPOINT = os.getenv("PHOENIX_COLLECTOR_ENDPOINT", "http://localhost:6006")
     PHOENIX_PROJECT_NAME = os.getenv("PHOENIX_PROJECT_NAME", "voyager-ai")
+    # Phoenix 21.x enables login/auth by default, which also protects its
+    # OTLP collector - without this, span export gets a 401 even though the
+    # endpoint is otherwise reachable. Generated under Settings > API Keys
+    # in the Phoenix UI; optional (only needed when the Phoenix instance has
+    # auth enabled, which is the default for this image).
+    PHOENIX_API_KEY = os.getenv("PHOENIX_API_KEY")
 
     # Phase 12: whether full prompt/completion text is captured in traces at
     # all (vs. metadata-only - model, token counts, duration). Separate from

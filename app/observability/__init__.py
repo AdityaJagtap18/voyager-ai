@@ -169,7 +169,10 @@ def configure_observability(app=None, engine=None) -> None:
         # evaluated against which provider is "current," which is exactly
         # the duplicate-instrumentation rule 9 for this phase).
         endpoint = Config.PHOENIX_COLLECTOR_ENDPOINT.rstrip("/") + "/v1/traces"
-        provider.add_span_processor(BatchSpanProcessor(_otlp_exporter(endpoint, protocol="http/protobuf")))
+        headers = {"Authorization": f"Bearer {Config.PHOENIX_API_KEY}"} if Config.PHOENIX_API_KEY else None
+        provider.add_span_processor(
+            BatchSpanProcessor(_otlp_exporter(endpoint, protocol="http/protobuf", headers=headers))
+        )
 
     trace.set_tracer_provider(provider)
     _configured = True
@@ -203,15 +206,15 @@ def configure_observability(app=None, engine=None) -> None:
     )
 
 
-def _otlp_exporter(endpoint: str, protocol: Optional[str] = None):
+def _otlp_exporter(endpoint: str, protocol: Optional[str] = None, headers: Optional[dict] = None):
     proto = (protocol or Config.OTEL_EXPORTER_OTLP_PROTOCOL or "http/protobuf").lower()
     if proto == "grpc":
         from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GrpcExporter
 
-        return GrpcExporter(endpoint=endpoint)
+        return GrpcExporter(endpoint=endpoint, headers=headers)
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HttpExporter
 
-    return HttpExporter(endpoint=endpoint)
+    return HttpExporter(endpoint=endpoint, headers=headers)
 
 
 def get_tracer(name: str = "voyager"):

@@ -45,14 +45,27 @@ services:
   phoenix:
     image: arizephoenix/phoenix:latest
     container_name: voyager-phoenix
+    environment:
+      # Without this, Phoenix's SQLite DB lives at /root/.phoenix inside the
+      # container - NOT under the phoenix-data volume below - so traces
+      # (and the admin/API-key accounts) are lost on every recreate.
+      # Confirmed live: found via `phoenix.config.ENV_PHOENIX_WORKING_DIR`.
+      - PHOENIX_WORKING_DIR=/mnt/data
     ports:
       - "6006:6006"  # Phoenix UI + OTLP/HTTP collector
-      - "4317:4317"  # OTLP/gRPC collector
+      # No gRPC port mapping: Voyager's exporter only ever speaks OTLP/HTTP
+      # (app/observability/_otlp_exporter), and host port 4317 is already
+      # bound by an unrelated container on this machine.
     volumes:
       - phoenix-data:/mnt/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6006/healthz"]
+      # The official image has no curl/wget - it does ship Python, which it
+      # needs to run Phoenix itself. Confirmed live: `curl`-based healthcheck
+      # never left "starting" even though the server was already serving
+      # 200s on /healthz; this is the same check via the interpreter that's
+      # actually present in the image.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
       interval: 30s
       timeout: 10s
       retries: 3
