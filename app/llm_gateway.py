@@ -31,7 +31,10 @@ class ModelInfo:
 
 
 MODEL_REGISTRY: Dict[str, ModelInfo] = {
-    "gpt-3.5-turbo": ModelInfo("gpt-3.5-turbo", "GPT-3.5 Turbo", "openai", 16385, requires_env="OPENAI_API_KEY"),
+    # gpt-3.5-turbo was removed from this registry: OpenAI deprecated it
+    # (litellm.NotFoundError on every real call) — discovered via live testing
+    # during Phase 3's planner-fusion work. gpt-4o-mini is the equivalent
+    # cheap/fast tier that's still live.
     "gpt-4o-mini": ModelInfo("gpt-4o-mini", "GPT-4o mini", "openai", 128000, requires_env="OPENAI_API_KEY"),
     "gpt-4o": ModelInfo("gpt-4o", "GPT-4o", "openai", 128000, requires_env="OPENAI_API_KEY"),
     "anthropic/claude-3-5-sonnet-20241022": ModelInfo(
@@ -43,7 +46,7 @@ MODEL_REGISTRY: Dict[str, ModelInfo] = {
     "ollama/llama3": ModelInfo("ollama/llama3", "Llama 3 (Ollama, local)", "ollama", 8192, local=True),
 }
 
-DEFAULT_MODEL = "gpt-3.5-turbo"
+DEFAULT_MODEL = "gpt-4o-mini"
 
 
 def is_configured(model_id: str) -> bool:

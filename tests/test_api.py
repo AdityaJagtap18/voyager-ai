@@ -261,7 +261,7 @@ def test_list_models_reports_configured_state(monkeypatch):
     assert resp.status_code == 200
     by_id = {m["id"]: m for m in resp.json()}
 
-    assert by_id["gpt-3.5-turbo"]["configured"] is True
+    assert by_id["gpt-4o-mini"]["configured"] is True
     assert by_id["anthropic/claude-3-5-sonnet-20241022"]["configured"] is False
     assert by_id["ollama/llama3"]["local"] is True
     assert by_id["ollama/llama3"]["configured"] is True  # no key needed

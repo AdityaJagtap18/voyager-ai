@@ -39,7 +39,7 @@ def _fresh_db():
 
 def test_list_models_returns_plain_dicts():
     models = mcp_server.list_models()
-    assert any(m["id"] == "gpt-3.5-turbo" for m in models)
+    assert any(m["id"] == "gpt-4o-mini" for m in models)
 
 
 def test_list_frameworks_returns_plain_dicts():

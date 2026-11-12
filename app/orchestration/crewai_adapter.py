@@ -176,7 +176,7 @@ class CrewAIOrchestrator:
                 ctx.trace.append(_trace_entry("itinerary", start, "error", str(exc)))
             return "Itinerary built"
 
-        llm = self.model or "gpt-3.5-turbo"
+        llm = self.model or "gpt-4o-mini"
 
         research_crew_agent = Agent(
             role="Travel Researcher",

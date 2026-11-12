@@ -161,7 +161,7 @@ cp .env.example .env
 ```env
 # OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-key-here
-OPENAI_MODEL=gpt-3.5-turbo
+OPENAI_MODEL=gpt-4o-mini
 OPENAI_TEMPERATURE=0.7
 
 # OpenRouteService Configuration
@@ -461,7 +461,7 @@ Edit `.env` file:
 # OpenAI Configuration
 # ==========================================
 OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxx
-OPENAI_MODEL=gpt-3.5-turbo              # or gpt-4 for better quality
+OPENAI_MODEL=gpt-4o-mini                # or gpt-4o for better quality
 OPENAI_TEMPERATURE=0.7                  # 0.0-1.0 (creativity level)
 
 # ==========================================

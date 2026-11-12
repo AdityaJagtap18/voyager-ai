@@ -7,8 +7,8 @@ def test_resolve_model_prefers_explicit_known_id():
 
 
 def test_resolve_model_falls_back_to_default_for_unknown_id(monkeypatch):
-    monkeypatch.setattr(Config, "OPENAI_MODEL", "gpt-3.5-turbo")
-    assert resolve_model("not-a-real-model") == "gpt-3.5-turbo"
+    monkeypatch.setattr(Config, "OPENAI_MODEL", "gpt-4o")
+    assert resolve_model("not-a-real-model") == "gpt-4o"
 
 
 def test_resolve_model_falls_back_to_configured_default_when_none_given(monkeypatch):
@@ -23,12 +23,12 @@ def test_resolve_model_falls_back_to_hardcoded_default_if_configured_default_unk
 
 def test_is_configured_true_for_openai_model_with_key(monkeypatch):
     monkeypatch.setattr(Config, "OPENAI_API_KEY", "sk-test")
-    assert is_configured("gpt-3.5-turbo") is True
+    assert is_configured("gpt-4o-mini") is True
 
 
 def test_is_configured_false_for_openai_model_without_key(monkeypatch):
     monkeypatch.setattr(Config, "OPENAI_API_KEY", None)
-    assert is_configured("gpt-3.5-turbo") is False
+    assert is_configured("gpt-4o-mini") is False
 
 
 def test_is_configured_true_for_local_model_regardless_of_keys(monkeypatch):
@@ -59,5 +59,5 @@ def test_get_chat_model_builds_a_langchain_compatible_model(monkeypatch):
 def test_get_chat_model_defaults_temperature_from_config(monkeypatch):
     monkeypatch.setattr(Config, "OPENAI_API_KEY", "sk-test")
     monkeypatch.setattr(Config, "OPENAI_TEMPERATURE", 0.9)
-    model = get_chat_model("gpt-3.5-turbo")
+    model = get_chat_model("gpt-4o-mini")
     assert model.temperature == 0.9
