@@ -14,6 +14,150 @@ from services import hotels_api
 from services.hotels_api import HotelsAPIError
 
 
+def get_real_hotels(destination: str, start_date: str, days: int) -> Optional[List[Dict]]:
+    """
+    Real, live hotel listings (Phase 3 fusion) via services/hotels_api.py
+    (Booking.com), in the same dict shape _get_accommodation_recommendations()
+    produces so downstream proximity scoring works unchanged either way.
+
+    A module-level function (not a method) because it needs no LLM - callers
+    like the Phase 11 "refresh real data" endpoint can call it directly
+    without paying for an AccommodationAgent's LLM init.
+
+    Returns None (not []) when real data isn't usable for any reason —
+    provider unconfigured, destination unresolvable, no offers found, or a
+    provider error — so the caller falls back to the LLM-generated flow
+    instead of a trip silently ending up with zero accommodations.
+    """
+    if not hotels_api.is_configured():
+        return None
+
+    try:
+        checkin = date.fromisoformat(start_date)
+        checkout = checkin + timedelta(days=days)
+
+        destinations = hotels_api.search_destination(destination)
+        if not destinations:
+            logger.warning(f"Real hotels: no destination match for '{destination}', falling back to LLM")
+            return None
+        dest = destinations[0]
+
+        offers = hotels_api.search_hotels(
+            dest["dest_id"], dest["search_type"], checkin.isoformat(), checkout.isoformat()
+        )
+        if not offers:
+            logger.warning(f"Real hotels: no offers for '{destination}', falling back to LLM")
+            return None
+
+        accommodations = []
+        for offer in offers[:5]:
+            coordinates = None
+            if offer.get("latitude") is not None and offer.get("longitude") is not None:
+                coordinates = {"lat": offer["latitude"], "lng": offer["longitude"]}
+
+            rating = f"{offer['review_score']}/10" if offer.get("review_score") is not None else "N/A"
+            stars = f"{offer['star_rating']}★" if offer.get("star_rating") else None
+
+            accommodations.append({
+                "name": offer.get("name") or "Unnamed property",
+                "type": "hotel",
+                "location": destination,
+                "neighborhood": destination,
+                "price_per_night": offer.get("price_formatted") or (
+                    f"{offer['price_raw']} {offer['currency']}" if offer.get("price_raw") is not None else "N/A"
+                ),
+                # Numeric fields alongside the display string (Phase 10 budget rollup) so a
+                # real nightly rate can be shown/summed without parsing "price_per_night"'s
+                # free-text formatting - never derived from it, straight from the provider.
+                "price_raw": offer.get("price_raw"),
+                "currency": offer.get("currency"),
+                "rating": rating,
+                "amenities": [],
+                "best_for": "all travelers",
+                "vibe": offer.get("review_score_word") or "N/A",
+                "proximity_to_center": "N/A",
+                "highlights": [stars] if stars else [],
+                "booking_tip": "Live pricing and availability from Booking.com — prices can change, book promptly.",
+                "description": f"Real-time Booking.com listing, rated {offer.get('review_score_word') or 'N/A'} "
+                                f"({rating}).",
+                "coordinates": coordinates,
+                "source": "real",
+            })
+
+        logger.info(f"Got {len(accommodations)} real hotel listings for {destination}")
+        return accommodations
+    except (HotelsAPIError, ValueError, KeyError) as e:
+        logger.warning(f"Real hotels lookup failed, falling back to LLM: {e}")
+        return None
+
+
+def calculate_attraction_proximity(accommodations: List[Dict], attractions: List[Dict]) -> List[Dict]:
+    """Calculate average distance from each accommodation to all attractions.
+
+    Module-level (not a method) so it can be called without an
+    AccommodationAgent/LLM init, same reasoning as get_real_hotels() above."""
+    logger.info("Calculating proximity to attractions")
+
+    attraction_coords = []
+    for attraction in attractions:
+        if attraction.get('coordinates'):
+            attraction_coords.append((
+                attraction['coordinates']['lat'],
+                attraction['coordinates']['lng']
+            ))
+
+    if not attraction_coords:
+        logger.warning("No attractions have coordinates")
+        return accommodations
+
+    for accommodation in accommodations:
+        if not accommodation.get('coordinates'):
+            accommodation['avg_distance_to_attractions'] = None
+            accommodation['distances_to_attractions'] = []
+            continue
+
+        accom_loc = (
+            accommodation['coordinates']['lat'],
+            accommodation['coordinates']['lng']
+        )
+
+        try:
+            results = matrix_distances(accom_loc, attraction_coords, profile="driving-car")
+
+            distances = []
+            for i, result in enumerate(results):
+                if result.get('status') == 'OK':
+                    distances.append({
+                        'attraction': attractions[i]['name'],
+                        'distance_km': result['distance_km'],
+                        'duration_minutes': int(result['duration_h'] * 60)
+                    })
+
+            accommodation['distances_to_attractions'] = distances
+
+            if distances:
+                avg_distance = sum(d['distance_km'] for d in distances) / len(distances)
+                accommodation['avg_distance_to_attractions'] = round(avg_distance, 2)
+                logger.info(f"  {accommodation['name']}: avg {avg_distance:.2f}km to attractions")
+            else:
+                accommodation['avg_distance_to_attractions'] = None
+
+        except Exception as e:
+            logger.error(f"  Error calculating distances for {accommodation['name']}: {e}")
+            accommodation['avg_distance_to_attractions'] = None
+            accommodation['distances_to_attractions'] = []
+
+    return accommodations
+
+
+def best_accommodation(accommodations: List[Dict]) -> Optional[Dict]:
+    """Module-level twin of AccommodationAgent.get_best_accommodation() - no LLM needed."""
+    valid_accommodations = [a for a in accommodations if a.get('avg_distance_to_attractions') is not None]
+    if not valid_accommodations:
+        return accommodations[0] if accommodations else None
+    return min(valid_accommodations, key=lambda x: x['avg_distance_to_attractions'])
+
+
 class AccommodationAgent:
     """Agent that recommends accommodations near attractions"""
 
@@ -55,7 +199,7 @@ class AccommodationAgent:
 
         accommodations = None
         if start_date:
-            accommodations = self._get_real_hotels(destination, start_date, days)
+            accommodations = get_real_hotels(destination, start_date, days)
 
         if accommodations is None:
             # Get accommodation recommendations from LLM
@@ -67,7 +211,7 @@ class AccommodationAgent:
 
         # If attractions provided, calculate average distance to attractions
         if attractions and any(a.get('coordinates') for a in attractions):
-            accommodations = self._calculate_attraction_proximity(
+            accommodations = calculate_attraction_proximity(
                 accommodations, attractions
             )
             
@@ -162,78 +306,6 @@ class AccommodationAgent:
             logger.error(f"Error getting accommodations: {e}")
             return []
 
-    def _get_real_hotels(self, destination: str, start_date: str, days: int) -> Optional[List[Dict]]:
-        """
-        Real, live hotel listings (Phase 3 fusion) via services/hotels_api.py
-        (Booking.com), in the same dict shape _get_accommodation_recommendations()
-        produces so downstream proximity scoring works unchanged either way.
-
-        Returns None (not []) when real data isn't usable for any reason —
-        provider unconfigured, destination unresolvable, no offers found, or a
-        provider error — so the caller falls back to the LLM-generated flow
-        instead of a trip silently ending up with zero accommodations.
-        """
-        if not hotels_api.is_configured():
-            return None
-
-        try:
-            checkin = date.fromisoformat(start_date)
-            checkout = checkin + timedelta(days=days)
-
-            destinations = hotels_api.search_destination(destination)
-            if not destinations:
-                logger.warning(f"Real hotels: no destination match for '{destination}', falling back to LLM")
-                return None
-            dest = destinations[0]
-
-            offers = hotels_api.search_hotels(
-                dest["dest_id"], dest["search_type"], checkin.isoformat(), checkout.isoformat()
-            )
-            if not offers:
-                logger.warning(f"Real hotels: no offers for '{destination}', falling back to LLM")
-                return None
-
-            accommodations = []
-            for offer in offers[:5]:
-                coordinates = None
-                if offer.get("latitude") is not None and offer.get("longitude") is not None:
-                    coordinates = {"lat": offer["latitude"], "lng": offer["longitude"]}
-
-                rating = f"{offer['review_score']}/10" if offer.get("review_score") is not None else "N/A"
-                stars = f"{offer['star_rating']}★" if offer.get("star_rating") else None
-
-                accommodations.append({
-                    "name": offer.get("name") or "Unnamed property",
-                    "type": "hotel",
-                    "location": destination,
-                    "neighborhood": destination,
-                    "price_per_night": offer.get("price_formatted") or (
-                        f"{offer['price_raw']} {offer['currency']}" if offer.get("price_raw") is not None else "N/A"
-                    ),
-                    # Numeric fields alongside the display string (Phase 10 budget rollup) so a
-                    # real nightly rate can be shown/summed without parsing "price_per_night"'s
-                    # free-text formatting - never derived from it, straight from the provider.
-                    "price_raw": offer.get("price_raw"),
-                    "currency": offer.get("currency"),
-                    "rating": rating,
-                    "amenities": [],
-                    "best_for": "all travelers",
-                    "vibe": offer.get("review_score_word") or "N/A",
-                    "proximity_to_center": "N/A",
-                    "highlights": [stars] if stars else [],
-                    "booking_tip": "Live pricing and availability from Booking.com — prices can change, book promptly.",
-                    "description": f"Real-time Booking.com listing, rated {offer.get('review_score_word') or 'N/A'} "
-                                    f"({rating}).",
-                    "coordinates": coordinates,
-                    "source": "real",
-                })
-
-            logger.info(f"Got {len(accommodations)} real hotel listings for {destination}")
-            return accommodations
-        except (HotelsAPIError, ValueError, KeyError) as e:
-            logger.warning(f"Real hotels lookup failed, falling back to LLM: {e}")
-            return None
-
     def _geocode_accommodations(self, accommodations: List[Dict], destination: str) -> List[Dict]:
         """Add coordinates to accommodations"""
         logger.info("Geocoding accommodations")
@@ -269,85 +341,10 @@ class AccommodationAgent:
         
         return accommodations
     
-    def _calculate_attraction_proximity(
-        self,
-        accommodations: List[Dict],
-        attractions: List[Dict]
-    ) -> List[Dict]:
-        """Calculate average distance from each accommodation to all attractions"""
-        logger.info("Calculating proximity to attractions")
-        
-        # Get attraction coordinates
-        attraction_coords = []
-        for attraction in attractions:
-            if attraction.get('coordinates'):
-                attraction_coords.append((
-                    attraction['coordinates']['lat'],
-                    attraction['coordinates']['lng']
-                ))
-        
-        if not attraction_coords:
-            logger.warning("No attractions have coordinates")
-            return accommodations
-        
-        # Calculate distances for each accommodation
-        for accommodation in accommodations:
-            if not accommodation.get('coordinates'):
-                accommodation['avg_distance_to_attractions'] = None
-                accommodation['distances_to_attractions'] = []
-                continue
-            
-            accom_loc = (
-                accommodation['coordinates']['lat'],
-                accommodation['coordinates']['lng']
-            )
-            
-            try:
-                # Calculate distances to all attractions
-                results = matrix_distances(
-                    accom_loc,
-                    attraction_coords,
-                    profile="driving-car"
-                )
-                
-                distances = []
-                for i, result in enumerate(results):
-                    if result.get('status') == 'OK':
-                        distances.append({
-                            'attraction': attractions[i]['name'],
-                            'distance_km': result['distance_km'],
-                            'duration_minutes': int(result['duration_h'] * 60)
-                        })
-                
-                accommodation['distances_to_attractions'] = distances
-                
-                # Calculate average distance
-                if distances:
-                    avg_distance = sum(d['distance_km'] for d in distances) / len(distances)
-                    accommodation['avg_distance_to_attractions'] = round(avg_distance, 2)
-                    logger.info(f"  {accommodation['name']}: avg {avg_distance:.2f}km to attractions")
-                else:
-                    accommodation['avg_distance_to_attractions'] = None
-                
-            except Exception as e:
-                logger.error(f"  Error calculating distances for {accommodation['name']}: {e}")
-                accommodation['avg_distance_to_attractions'] = None
-                accommodation['distances_to_attractions'] = []
-        
-        return accommodations
-    
-    def get_best_accommodation(self, accommodations: List[Dict]) -> Dict:
+    def get_best_accommodation(self, accommodations: List[Dict]) -> Optional[Dict]:
         """Get the accommodation with best proximity to attractions"""
-        valid_accommodations = [
-            a for a in accommodations 
-            if a.get('avg_distance_to_attractions') is not None
-        ]
-        
-        if not valid_accommodations:
-            return accommodations[0] if accommodations else None
-        
-        return min(valid_accommodations, key=lambda x: x['avg_distance_to_attractions'])
-    
+        return best_accommodation(accommodations)
+
     def _create_error_response(self) -> List[Dict]:
         """Create fallback response"""
         return [{

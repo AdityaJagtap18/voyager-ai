@@ -124,6 +124,7 @@ export const api = {
     request<TripDetail>(`/api/trips/${id}/select-flight`, { method: "PATCH", body: JSON.stringify({ index }) }),
   selectAccommodation: (id: string, index: number) =>
     request<TripDetail>(`/api/trips/${id}/select-accommodation`, { method: "PATCH", body: JSON.stringify({ index }) }),
+  refreshRealData: (id: string) => request<TripDetail>(`/api/trips/${id}/refresh-real-data`, { method: "POST" }),
 
   listBookings: (tripId: string) => request<Booking[]>(`/api/trips/${tripId}/bookings`),
   createBooking: (tripId: string, payload: BookingCreateRequest) =>

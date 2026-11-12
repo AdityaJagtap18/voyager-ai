@@ -686,5 +686,45 @@ trip's planning run found the actual cause, confirmed live:
 
 **Not fixed, and out of scope for this session**: the ORS and Booking.com quota exhaustion itself
 (these are external account limits - upgrading either plan or waiting for the quota window to reset is
-the only remedy) and re-running flight/accommodation search for this specific already-planned Mumbai
-trip (would need a new "refresh real data on an existing trip" endpoint, which doesn't exist yet).
+the only remedy).
+
+## Refresh real data on an already-planned trip (Phase 11i)
+
+Built the "re-run flight/accommodation search for an already-planned trip" endpoint flagged as missing
+above - for exactly the Mumbai case: a trip planned while a provider was down/rate-limited shouldn't be
+stuck with LLM-only data forever once that provider recovers.
+
+**`POST /api/trips/{trip_id}/refresh-real-data`** re-attempts each real-data lookup directly (no LLM,
+no re-running research/dining/itinerary) and replaces only the plan sections where fresh real data came
+back:
+- **Flights**: `flights_api.search_flights_for_trip(trip.origin, trip.destination, trip.start_date)` -
+  skipped (not called) if either field is unset.
+- **Accommodations**: the same live Booking.com lookup `AccommodationAgent` uses, re-scored against the
+  trip's existing attractions for proximity, replacing `plan.accommodations` on success.
+- **Transportation**: a fresh airport-transfer route to whichever accommodation (just-refreshed or
+  existing) has coordinates.
+
+Each step either stays untouched (the existing real-or-LLM data is never discarded on a failed retry)
+or gets replaced, and every attempt appends a `{step, status: "success"|"skipped"|"error", ...}` trace
+entry so the caller can tell "tried and found nothing" from "tried and it worked" - the same honesty
+discipline as every other real-data lookup in this app.
+
+**Refactor enabling this**: `AccommodationAgent._get_real_hotels`/`_calculate_attraction_proximity`/
+`get_best_accommodation` didn't use the LLM at all, so they're now module-level functions
+(`get_real_hotels`/`calculate_attraction_proximity`/`best_accommodation` in
+`app/agents/accommodation_agent.py`) the new endpoint calls directly - avoiding an unnecessary
+`AccommodationAgent()` (and its LLM init) just to reach real-hotel lookup code. The class methods now
+delegate to these functions, so existing callers are unaffected.
+
+**Frontend**: a "Refresh real data" button on Trip Detail, next to the day/type/budget summary line,
+visible whenever the trip has a plan. Shows which sections actually got new real data ("Refreshed:
+flights, accommodations.") or, honestly, that nothing changed ("No new real data found yet — providers
+still have nothing to offer for this trip.").
+
+7 new API tests (400 with no plan, skip-without-origin/date, replace-on-success and
+keep-existing-on-nothing-found for flights, replace-on-success for accommodations, and
+compute/skip for transportation depending on accommodation coordinates). Live-verified against the
+real Mumbai trip: clicking the button re-tried all three providers and correctly reported nothing
+refreshed, since ORS geocoding, Booking.com hotels, and (newly discovered in this same test) the
+flights-sky API have all hit their monthly quotas right now - confirmed from the backend log, thanks to
+the logging fix above, rather than being a silent guess.

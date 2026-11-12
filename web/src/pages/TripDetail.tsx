@@ -36,6 +36,8 @@ export default function TripDetail() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const [refreshingRealData, setRefreshingRealData] = useState(false);
+  const [refreshResult, setRefreshResult] = useState<string | null>(null);
   const [displayCurrency, setDisplayCurrency] = useState<string>("");
   const [rateCache, setRateCache] = useState<Record<string, number>>({});
   const [rateLoading, setRateLoading] = useState(false);
@@ -130,6 +132,29 @@ export default function TripDetail() {
     }
   }
 
+  async function handleRefreshRealData() {
+    if (!id) return;
+    setRefreshingRealData(true);
+    setRefreshResult(null);
+    try {
+      const updated = await api.refreshRealData(id);
+      setTrip(updated);
+      const latest = updated.trace.slice(-3);
+      const refreshed = latest
+        .filter((t) => t.status === "success")
+        .map((t) => t.step.replace("_refresh", ""));
+      setRefreshResult(
+        refreshed.length > 0
+          ? `Refreshed: ${refreshed.join(", ")}.`
+          : "No new real data found yet — providers still have nothing to offer for this trip."
+      );
+    } catch (e) {
+      setRefreshResult(e instanceof Error ? e.message : "Refresh failed.");
+    } finally {
+      setRefreshingRealData(false);
+    }
+  }
+
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
   if (!trip) return <Spinner />;
 
@@ -163,10 +188,27 @@ export default function TripDetail() {
         </div>
       </div>
 
-      <p className="mb-6 ml-12 text-sm text-ink-500">
+      <p className="mb-2 ml-12 text-sm text-ink-500">
         {trip.days} day{trip.days === 1 ? "" : "s"} · {trip.trip_type} · {trip.budget}
         {trip.dietary_preferences.length > 0 && <> · {trip.dietary_preferences.join(", ")}</>}
       </p>
+
+      {trip.plan && (
+        <div className="mb-6 ml-12 flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleRefreshRealData}
+            disabled={refreshingRealData}
+            className="rounded-full border border-ink-900/10 px-3 py-1 text-xs font-medium hover:bg-brand-50 disabled:opacity-50"
+          >
+            {refreshingRealData ? "Refreshing…" : "Refresh real data"}
+          </button>
+          <span className="text-xs text-ink-400">
+            Re-tries live flight/hotel/transfer lookups — useful if a provider was down or rate-limited
+            when this trip was first planned.
+          </span>
+          {refreshResult && <span className="w-full text-xs font-medium text-ink-600">{refreshResult}</span>}
+        </div>
+      )}
 
       {trip.status === "planning" && (
         <p className="rounded-xl2 border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

@@ -103,6 +103,8 @@ from app.schemas import (  # noqa: E402
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 from agents.itinerary_agent import ItineraryAgent  # noqa: E402
+from agents.transport_agent import TransportAgent  # noqa: E402
+from agents.accommodation_agent import get_real_hotels, calculate_attraction_proximity, best_accommodation  # noqa: E402
 from services.budget_allocator import allocate_budget  # noqa: E402
 from services.flight_recommendations import recommend_flights  # noqa: E402
 from services.transport_recommendations import recommend_transport  # noqa: E402
@@ -587,6 +589,85 @@ def select_accommodation(trip_id: str, payload: SelectIndexRequest, db: Session 
         trip.trace = (trip.trace or []) + [_recompute_trace_entry("itinerary_recompute", start, "error", str(e))]
 
     trip.selected_accommodation_index = payload.index
+    db.commit()
+    db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
+    return trip
+
+
+@app.post("/api/trips/{trip_id}/refresh-real-data", response_model=TripDetail)
+def refresh_real_data(trip_id: str, db: Session = Depends(get_db)):
+    """Re-attempts real flights/accommodation/transportation lookups for an
+    already-planned trip - for the case where a provider was unconfigured,
+    rate-limited, or erroring at plan time but may work now. Never re-runs
+    research/dining/itinerary, and never invents data: each lookup either
+    replaces the corresponding plan section with fresh real data, or leaves
+    the existing section (real or LLM-generated) untouched if the provider
+    still has nothing real to offer."""
+    trip = _get_trip_or_404(trip_id, db)
+    if not trip.plan:
+        raise HTTPException(status_code=400, detail="This trip has no plan yet - nothing to refresh")
+
+    plan = dict(trip.plan)
+    trace_entries = []
+
+    start = time.monotonic()
+    if trip.origin and trip.start_date:
+        try:
+            flights = flights_api.search_flights_for_trip(trip.origin, trip.destination, trip.start_date)
+            if flights:
+                plan["flights"] = flights
+                trace_entries.append(_recompute_trace_entry("flights_refresh", start, "success"))
+            else:
+                trace_entries.append(_recompute_trace_entry("flights_refresh", start, "skipped", "No real offers found"))
+        except FlightsAPIError as e:
+            trace_entries.append(_recompute_trace_entry("flights_refresh", start, "error", str(e)))
+    else:
+        trace_entries.append(_recompute_trace_entry("flights_refresh", start, "skipped", "No origin/start_date set"))
+
+    start = time.monotonic()
+    if trip.start_date:
+        try:
+            accommodations = get_real_hotels(trip.destination, trip.start_date, trip.days)
+            if accommodations:
+                attractions = plan.get("attractions") or []
+                if attractions and any(a.get("coordinates") for a in attractions):
+                    accommodations = calculate_attraction_proximity(accommodations, attractions)
+                    accommodations.sort(
+                        key=lambda a: a.get("avg_distance_to_attractions")
+                        if a.get("avg_distance_to_attractions") is not None else float("inf")
+                    )
+                plan["accommodations"] = accommodations
+                trace_entries.append(_recompute_trace_entry("accommodations_refresh", start, "success"))
+            else:
+                trace_entries.append(_recompute_trace_entry("accommodations_refresh", start, "skipped", "No real listings found"))
+        except HotelsAPIError as e:
+            trace_entries.append(_recompute_trace_entry("accommodations_refresh", start, "error", str(e)))
+    else:
+        trace_entries.append(_recompute_trace_entry("accommodations_refresh", start, "skipped", "No start_date set"))
+
+    start = time.monotonic()
+    accommodations = plan.get("accommodations") or []
+    best = best_accommodation(accommodations) if accommodations else None
+    best_location = (
+        (best["coordinates"]["lat"], best["coordinates"]["lng"])
+        if best and best.get("coordinates") else None
+    )
+    if best_location:
+        try:
+            transportation = TransportAgent().find_airport_transfer(trip.destination, best_location)
+            if transportation:
+                plan["transportation"] = transportation
+                trace_entries.append(_recompute_trace_entry("transportation_refresh", start, "success"))
+            else:
+                trace_entries.append(_recompute_trace_entry("transportation_refresh", start, "skipped", "No real route found"))
+        except ORSError as e:
+            trace_entries.append(_recompute_trace_entry("transportation_refresh", start, "error", str(e)))
+    else:
+        trace_entries.append(_recompute_trace_entry("transportation_refresh", start, "skipped", "No accommodation coordinates available"))
+
+    trip.plan = plan
+    trip.trace = (trip.trace or []) + trace_entries
     db.commit()
     db.refresh(trip)
     _attach_derived_recommendations(trip, db)

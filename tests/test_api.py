@@ -1111,6 +1111,118 @@ def test_get_trip_computes_accommodation_recommendations_from_real_listings():
     assert rec["recommended"]["most_central"] == 1
 
 
+def _create_test_trip_with_origin(plan=None, origin="Pune", start_date="2026-12-01") -> str:
+    db = TestingSessionLocal()
+    trip = api_module.Trip(
+        destination="Mumbai, India", days=3, trip_type="relaxation", budget="mid-range",
+        status="complete", plan=plan, origin=origin, start_date=start_date,
+    )
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    trip_id = trip.id
+    db.close()
+    return trip_id
+
+
+# --- Phase 11h: refresh real data for an already-planned trip --------------
+
+
+def test_refresh_real_data_400_without_any_plan():
+    trip_id = _create_test_trip_with_origin(plan=None)
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 400
+
+
+def test_refresh_real_data_skips_flights_without_origin_or_start_date():
+    trip_id = _create_test_trip_with_origin(plan={"flights": []}, origin=None, start_date=None)
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    trace = resp.json()["trace"]
+    flights_step = next(t for t in trace if t["step"] == "flights_refresh")
+    assert flights_step["status"] == "skipped"
+
+
+def test_refresh_real_data_replaces_flights_when_real_offers_found(monkeypatch):
+    monkeypatch.setattr(
+        api_module.flights_api, "search_flights_for_trip",
+        lambda origin, destination, depart_date, limit=5: [
+            {"price_raw": 100.0, "currency": "USD", "duration_minutes": 120, "stops": 0, "source": "real"},
+        ],
+    )
+    trip_id = _create_test_trip_with_origin(plan={"flights": []})
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"]["flights"][0]["price_raw"] == 100.0
+    flights_step = next(t for t in body["trace"] if t["step"] == "flights_refresh")
+    assert flights_step["status"] == "success"
+
+
+def test_refresh_real_data_keeps_existing_flights_when_provider_finds_nothing(monkeypatch):
+    monkeypatch.setattr(
+        api_module.flights_api, "search_flights_for_trip",
+        lambda origin, destination, depart_date, limit=5: None,
+    )
+    existing_plan = {"flights": [{"price_raw": 50.0, "currency": "USD", "source": "real"}]}
+    trip_id = _create_test_trip_with_origin(plan=existing_plan)
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"]["flights"] == existing_plan["flights"]
+    flights_step = next(t for t in body["trace"] if t["step"] == "flights_refresh")
+    assert flights_step["status"] == "skipped"
+
+
+def test_refresh_real_data_replaces_accommodations_when_real_listings_found(monkeypatch):
+    monkeypatch.setattr(
+        api_module, "get_real_hotels",
+        lambda destination, start_date, days: [
+            {"name": "Real Hotel", "price_raw": 80.0, "currency": "USD", "rating": "8.0/10",
+             "coordinates": None, "source": "real"},
+        ],
+    )
+    trip_id = _create_test_trip_with_origin(plan={"accommodations": [{"name": "AI Villa", "source": "llm"}]})
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"]["accommodations"][0]["name"] == "Real Hotel"
+    acc_step = next(t for t in body["trace"] if t["step"] == "accommodations_refresh")
+    assert acc_step["status"] == "success"
+
+
+def test_refresh_real_data_computes_transportation_from_refreshed_accommodation_coordinates(monkeypatch):
+    monkeypatch.setattr(
+        api_module, "get_real_hotels",
+        lambda destination, start_date, days: [
+            {"name": "Real Hotel", "price_raw": 80.0, "currency": "USD", "rating": "8.0/10",
+             "coordinates": {"lat": 19.0, "lng": 72.8}, "source": "real"},
+        ],
+    )
+    monkeypatch.setattr(
+        api_module.TransportAgent, "find_airport_transfer",
+        lambda self, destination, accommodation_location: {
+            "mode": "driving", "from": f"{destination} Airport", "to": "accommodation",
+            "distance_km": 12.0, "duration_h": 0.4, "geometry": [], "source": "real",
+        },
+    )
+    trip_id = _create_test_trip_with_origin(plan={"accommodations": []})
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["plan"]["transportation"]["distance_km"] == 12.0
+    transport_step = next(t for t in body["trace"] if t["step"] == "transportation_refresh")
+    assert transport_step["status"] == "success"
+
+
+def test_refresh_real_data_skips_transportation_without_accommodation_coordinates():
+    trip_id = _create_test_trip_with_origin(plan={"accommodations": [{"name": "AI Villa", "source": "llm"}]})
+    resp = client.post(f"/api/trips/{trip_id}/refresh-real-data")
+    assert resp.status_code == 200
+    transport_step = next(t for t in resp.json()["trace"] if t["step"] == "transportation_refresh")
+    assert transport_step["status"] == "skipped"
+
+
 # --- Phase 11d: currency conversion -----------------------------------------
 
 
