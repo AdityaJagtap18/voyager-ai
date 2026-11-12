@@ -3,9 +3,17 @@ import Spinner from "../components/Spinner";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
-import type { ObservabilityOverview, ObservabilitySpan, ObservabilityTraceSummary } from "../types";
+import type {
+  EvaluationRunSummary,
+  ObservabilityAgentStats,
+  ObservabilityLogEntry,
+  ObservabilityModelStats,
+  ObservabilityOverview,
+  ObservabilitySpan,
+  ObservabilityTraceSummary,
+} from "../types";
 
-type ObsTab = "overview" | "traces";
+type ObsTab = "overview" | "traces" | "agents" | "models" | "evaluations" | "logs";
 
 function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -81,6 +89,17 @@ export default function Observability() {
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null);
   const [spans, setSpans] = useState<ObservabilitySpan[] | null>(null);
   const [spansError, setSpansError] = useState<string | null>(null);
+  const [agents, setAgents] = useState<ObservabilityAgentStats[] | null>(null);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
+  const [models, setModels] = useState<ObservabilityModelStats[] | null>(null);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+  const [evalRuns, setEvalRuns] = useState<EvaluationRunSummary[] | null>(null);
+  const [evalRunsError, setEvalRunsError] = useState<string | null>(null);
+  const [logs, setLogs] = useState<ObservabilityLogEntry[] | null>(null);
+  const [logsTotal, setLogsTotal] = useState(0);
+  const [logsError, setLogsError] = useState<string | null>(null);
+  const [logStatusFilter, setLogStatusFilter] = useState<string>("");
+  const [logNameFilter, setLogNameFilter] = useState<string>("");
 
   useEffect(() => {
     api.observabilityOverview().then(setOverview).catch((e) => setOverviewError(e.message));
@@ -99,6 +118,31 @@ export default function Observability() {
     setSpansError(null);
     api.observabilityTrace(selectedTraceId).then(setSpans).catch((e) => setSpansError(e.message));
   }, [selectedTraceId]);
+
+  useEffect(() => {
+    if (obsTab === "agents" && !agents) {
+      api.observabilityAgents().then(setAgents).catch((e) => setAgentsError(e.message));
+    }
+    if (obsTab === "models" && !models) {
+      api.observabilityModels().then(setModels).catch((e) => setModelsError(e.message));
+    }
+    if (obsTab === "evaluations" && !evalRuns) {
+      api.listEvaluationRuns().then(setEvalRuns).catch((e) => setEvalRunsError(e.message));
+    }
+  }, [obsTab, agents, models, evalRuns]);
+
+  useEffect(() => {
+    if (obsTab !== "logs") return;
+    setLogs(null);
+    setLogsError(null);
+    api
+      .observabilityLogs(50, 0, logStatusFilter || undefined, logNameFilter || undefined)
+      .then((r) => {
+        setLogs(r.items);
+        setLogsTotal(r.total);
+      })
+      .catch((e) => setLogsError(e.message));
+  }, [obsTab, logStatusFilter, logNameFilter]);
 
   const latestTrace = traces?.[0];
 
@@ -139,7 +183,7 @@ export default function Observability() {
       )}
 
       <div className="mb-4 flex gap-1 border-b border-ink-900/10">
-        {(["overview", "traces"] as ObsTab[]).map((t) => (
+        {(["overview", "traces", "agents", "models", "evaluations", "logs"] as ObsTab[]).map((t) => (
           <button
             key={t}
             onClick={() => setObsTab(t)}
@@ -220,6 +264,168 @@ export default function Observability() {
         <p className="text-sm text-ink-500">
           No trip-generation runs recorded yet. <Link to="/plan" className="font-medium text-brand-600">Plan a trip</Link> to see its trace here.
         </p>
+      )}
+
+      {obsTab === "agents" && (
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
+          {agentsError && <p className="p-5 text-sm text-rose-600">{agentsError}</p>}
+          {!agents && !agentsError && <div className="p-5"><Spinner /></div>}
+          {agents && agents.length === 0 && (
+            <p className="p-5 text-sm text-ink-500">No agent spans recorded yet.</p>
+          )}
+          {agents && agents.length > 0 && (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-ink-900/5 text-left text-xs font-medium text-ink-500">
+                  <th className="px-4 py-3">Agent</th>
+                  <th className="px-4 py-3">Calls</th>
+                  <th className="px-4 py-3">Avg. duration</th>
+                  <th className="px-4 py-3">Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {agents.map((a) => (
+                  <tr key={a.name} className="border-b border-ink-900/5 last:border-b-0">
+                    <td className="px-4 py-3 font-medium text-ink-900">{a.name}</td>
+                    <td className="px-4 py-3 text-ink-700">{a.call_count}</td>
+                    <td className="px-4 py-3 text-ink-700">{formatDuration(a.avg_duration_ms)}</td>
+                    <td className={`px-4 py-3 ${a.error_count > 0 ? "text-rose-600" : "text-ink-700"}`}>{a.error_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {obsTab === "models" && (
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
+          {modelsError && <p className="p-5 text-sm text-rose-600">{modelsError}</p>}
+          {!models && !modelsError && <div className="p-5"><Spinner /></div>}
+          {models && models.length === 0 && (
+            <p className="p-5 text-sm text-ink-500">No LLM calls recorded yet.</p>
+          )}
+          {models && models.length > 0 && (
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-900/5 text-left text-xs font-medium text-ink-500">
+                    <th className="px-4 py-3">Model</th>
+                    <th className="px-4 py-3">Calls</th>
+                    <th className="px-4 py-3">Avg. duration</th>
+                    <th className="px-4 py-3">Input tokens</th>
+                    <th className="px-4 py-3">Output tokens</th>
+                    <th className="px-4 py-3">Est. cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {models.map((m) => (
+                    <tr key={m.model} className="border-b border-ink-900/5 last:border-b-0">
+                      <td className="px-4 py-3 font-medium text-ink-900">{m.model}</td>
+                      <td className="px-4 py-3 text-ink-700">{m.call_count}</td>
+                      <td className="px-4 py-3 text-ink-700">{formatDuration(m.avg_duration_ms)}</td>
+                      <td className="px-4 py-3 text-ink-700">{m.total_input_tokens?.toLocaleString() ?? "—"}</td>
+                      <td className="px-4 py-3 text-ink-700">{m.total_output_tokens?.toLocaleString() ?? "—"}</td>
+                      <td className="px-4 py-3 text-ink-700">
+                        {m.estimated_cost_usd != null ? `$${m.estimated_cost_usd.toFixed(4)}` : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-ink-900/5 p-3 text-xs text-ink-400">
+                Estimated from app/pricing.py's published per-token rates; "—" means pricing is unknown for that
+                model or some calls in the group are missing token counts.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {obsTab === "evaluations" && (
+        <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
+          {evalRunsError && <p className="text-sm text-rose-600">{evalRunsError}</p>}
+          {!evalRuns && !evalRunsError && <Spinner />}
+          {evalRuns && evalRuns.length === 0 && (
+            <p className="text-sm text-ink-500">
+              No evaluation runs yet. Run the canned case suite from{" "}
+              <Link to="/ai/evaluations" className="font-medium text-brand-600">Evaluations</Link>.
+            </p>
+          )}
+          {evalRuns && evalRuns.length > 0 && (
+            <>
+              <div className="flex flex-col gap-2">
+                {evalRuns.slice(0, 10).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between rounded-lg border border-ink-900/5 px-3 py-2 text-sm">
+                    <span className="font-medium text-ink-900">
+                      {r.framework ?? "—"} · {r.model ?? "—"}
+                    </span>
+                    <span className="text-ink-500">
+                      <span className="text-emerald-600">{r.pass_count} passed</span>
+                      {r.fail_count > 0 && <span className="ml-2 text-rose-600">{r.fail_count} failed</span>}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Link to="/ai/evaluations" className="mt-4 inline-block text-sm font-medium text-brand-600">
+                View all evaluation runs →
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+
+      {obsTab === "logs" && (
+        <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card">
+          <div className="flex flex-wrap gap-2 border-b border-ink-900/5 p-3">
+            <select
+              value={logStatusFilter}
+              onChange={(e) => setLogStatusFilter(e.target.value)}
+              className="rounded-lg border border-ink-900/10 px-2 py-1 text-sm"
+            >
+              <option value="">All statuses</option>
+              <option value="ok">ok</option>
+              <option value="error">error</option>
+              <option value="unset">unset</option>
+            </select>
+            <input
+              value={logNameFilter}
+              onChange={(e) => setLogNameFilter(e.target.value)}
+              placeholder="Filter by span name..."
+              className="flex-1 rounded-lg border border-ink-900/10 px-2 py-1 text-sm"
+            />
+          </div>
+          {logsError && <p className="p-5 text-sm text-rose-600">{logsError}</p>}
+          {!logs && !logsError && <div className="p-5"><Spinner /></div>}
+          {logs && logs.length === 0 && <p className="p-5 text-sm text-ink-500">No spans match this filter.</p>}
+          {logs && logs.length > 0 && (
+            <>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-ink-900/5 text-left text-xs font-medium text-ink-500">
+                    <th className="px-4 py-2">Name</th>
+                    <th className="px-4 py-2">Status</th>
+                    <th className="px-4 py-2">Duration</th>
+                    <th className="px-4 py-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map((l) => (
+                    <tr key={l.span_id} className="border-b border-ink-900/5 last:border-b-0">
+                      <td className="px-4 py-2 font-mono text-xs text-ink-800">{l.name}</td>
+                      <td className="px-4 py-2"><StatusBadge status={l.status} /></td>
+                      <td className="px-4 py-2 text-ink-700">{formatDuration(l.duration_ms)}</td>
+                      <td className="px-4 py-2 text-xs text-ink-500">{new Date(l.start_time).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="border-t border-ink-900/5 p-3 text-xs text-ink-400">
+                Showing {logs.length} of {logsTotal} spans.
+              </p>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

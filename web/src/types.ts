@@ -508,6 +508,37 @@ export interface ObservabilitySpan {
   attributes: Record<string, unknown>;
 }
 
+export interface ObservabilityAgentStats {
+  name: string;
+  call_count: number;
+  avg_duration_ms: number;
+  error_count: number;
+}
+
+export interface ObservabilityModelStats {
+  model: string;
+  call_count: number;
+  avg_duration_ms: number;
+  total_input_tokens: number | null;
+  total_output_tokens: number | null;
+  estimated_cost_usd: number | null;
+}
+
+export interface ObservabilityLogEntry {
+  span_id: string;
+  trace_id: string;
+  name: string;
+  start_time: string;
+  duration_ms: number;
+  status: string;
+  status_message: string | null;
+}
+
+export interface ObservabilityLogsResponse {
+  total: number;
+  items: ObservabilityLogEntry[];
+}
+
 export interface MapPlace {
   label: string | null;
   lat: number;

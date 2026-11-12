@@ -18,6 +18,9 @@ import type {
   MapPlace,
   MapRoute,
   ModelInfo,
+  ObservabilityAgentStats,
+  ObservabilityLogsResponse,
+  ObservabilityModelStats,
   ObservabilityOverview,
   ObservabilitySpan,
   ObservabilityTraceSummary,
@@ -244,6 +247,14 @@ export const api = {
     request<ObservabilityTraceSummary[]>(`/api/observability/traces?${new URLSearchParams({ limit: String(limit) })}`),
   observabilityTrace: (traceId: string) =>
     request<ObservabilitySpan[]>(`/api/observability/traces/${traceId}`),
+  observabilityAgents: () => request<ObservabilityAgentStats[]>("/api/observability/agents"),
+  observabilityModels: () => request<ObservabilityModelStats[]>("/api/observability/models"),
+  observabilityLogs: (limit = 50, offset = 0, status?: string, nameContains?: string) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (status) params.set("status", status);
+    if (nameContains) params.set("name_contains", nameContains);
+    return request<ObservabilityLogsResponse>(`/api/observability/logs?${params.toString()}`);
+  },
 
   mapsSearch: (query: string) =>
     request<MapPlace[]>(`/api/maps/search?${new URLSearchParams({ query })}`),

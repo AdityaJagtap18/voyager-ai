@@ -1354,3 +1354,106 @@ def test_trip_assistant_422_when_message_empty(monkeypatch):
     trip_id = _create_test_trip()
     resp = client.post(f"/api/trips/{trip_id}/assistant", json={"message": ""})
     assert resp.status_code == 422
+
+
+# --- Observability dashboard (Phase 12 / Phase 4 UI) ----------------------------
+
+
+def _make_span(db, **overrides):
+    from datetime import datetime, timedelta
+
+    from app.models_db import Span
+
+    start = overrides.pop("start_time", datetime(2026, 1, 1, 12, 0, 0))
+    duration_ms = overrides.pop("duration_ms", 1000.0)
+    defaults = dict(
+        trace_id="trace1",
+        span_id="span" + os.urandom(4).hex(),
+        parent_span_id=None,
+        name="agent.research",
+        trip_id=None,
+        start_time=start,
+        end_time=start + timedelta(milliseconds=duration_ms),
+        duration_ms=duration_ms,
+        status="ok",
+        status_message=None,
+        attributes={},
+        resource={},
+        events=[],
+    )
+    defaults.update(overrides)
+    span = Span(**defaults)
+    db.add(span)
+    db.commit()
+    return span
+
+
+def test_observability_agents_aggregates_by_agent_span_name():
+    db = TestingSessionLocal()
+    _make_span(db, name="agent.research", duration_ms=1000.0, status="ok")
+    _make_span(db, name="agent.research", duration_ms=2000.0, status="error")
+    _make_span(db, name="voyager.trip.generate", duration_ms=5000.0)  # not an agent span - excluded
+    db.close()
+
+    resp = client.get("/api/observability/agents")
+    assert resp.status_code == 200
+    rows = {r["name"]: r for r in resp.json()}
+    assert rows["agent.research"]["call_count"] == 2
+    assert rows["agent.research"]["avg_duration_ms"] == 1500.0
+    assert rows["agent.research"]["error_count"] == 1
+    assert "voyager.trip.generate" not in rows
+
+
+def test_observability_models_computes_cost_only_when_all_calls_have_usage():
+    db = TestingSessionLocal()
+    _make_span(
+        db,
+        name="llm.request",
+        duration_ms=500.0,
+        attributes={"llm.model": "gpt-4o-mini", "llm.usage.input_tokens": 1_000_000, "llm.usage.output_tokens": 1_000_000},
+    )
+    db.close()
+
+    resp = client.get("/api/observability/models")
+    assert resp.status_code == 200
+    row = next(r for r in resp.json() if r["model"] == "gpt-4o-mini")
+    assert row["call_count"] == 1
+    assert row["total_input_tokens"] == 1_000_000
+    assert row["total_output_tokens"] == 1_000_000
+    # gpt-4o-mini: $0.15/1M in + $0.60/1M out -> $0.75 for 1M+1M tokens
+    assert row["estimated_cost_usd"] == pytest.approx(0.75)
+
+
+def test_observability_models_cost_is_null_when_any_call_missing_usage():
+    db = TestingSessionLocal()
+    _make_span(
+        db,
+        name="llm.request",
+        attributes={"llm.model": "gpt-4o-mini", "llm.usage.input_tokens": 100, "llm.usage.output_tokens": 50},
+    )
+    _make_span(db, name="llm.request", attributes={"llm.model": "gpt-4o-mini"})  # redacted/missing usage
+    db.close()
+
+    resp = client.get("/api/observability/models")
+    row = next(r for r in resp.json() if r["model"] == "gpt-4o-mini")
+    assert row["call_count"] == 2
+    assert row["estimated_cost_usd"] is None
+
+
+def test_observability_logs_filters_by_status_and_name_and_paginates():
+    db = TestingSessionLocal()
+    _make_span(db, name="agent.research", status="ok")
+    _make_span(db, name="agent.flights", status="error")
+    db.close()
+
+    resp = client.get("/api/observability/logs")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 2
+    assert len(body["items"]) == 2
+
+    resp = client.get("/api/observability/logs?status=error")
+    assert [i["name"] for i in resp.json()["items"]] == ["agent.flights"]
+
+    resp = client.get("/api/observability/logs?name_contains=research")
+    assert [i["name"] for i in resp.json()["items"]] == ["agent.research"]

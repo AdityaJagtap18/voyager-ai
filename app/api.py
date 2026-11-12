@@ -63,6 +63,7 @@ from services.ors_api import ORSError  # noqa: E402
 from services.weather_api import WeatherAPIError  # noqa: E402
 from app.models_db import EvaluationRun, GuardrailEvent, TripDocument  # noqa: E402
 from app.models_db import Span  # noqa: E402
+from app.pricing import estimate_cost_usd  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -1151,3 +1152,101 @@ def get_observability_trace(trace_id: str, db: Session = Depends(get_db)):
         }
         for s in spans
     ]
+
+
+@app.get("/api/observability/agents")
+def observability_agent_performance(db: Session = Depends(get_db)):
+    """Per-agent-span aggregates (Part 4 "Agent performance") - grouped by the
+    real span name every agent node wraps itself in (app/workflow.py /
+    app/orchestration), e.g. "agent.research", "agent.itinerary". Spans with
+    any other name (the root span, raw http/llm spans) are excluded."""
+    agent_spans = db.query(Span).filter(Span.name.like("agent.%")).all()
+    by_name: Dict[str, List[Span]] = {}
+    for s in agent_spans:
+        by_name.setdefault(s.name, []).append(s)
+
+    return [
+        {
+            "name": name,
+            "call_count": len(spans),
+            "avg_duration_ms": round(sum(s.duration_ms for s in spans) / len(spans), 0),
+            "error_count": sum(1 for s in spans if s.status == "error"),
+        }
+        for name, spans in sorted(by_name.items())
+    ]
+
+
+@app.get("/api/observability/models")
+def observability_model_usage(db: Session = Depends(get_db)):
+    """Per-model aggregates (Part 8 "Tokenomics") built from real llm.request
+    spans - call volume, latency, token usage, and an estimated USD cost from
+    app/pricing.py. estimated_cost_usd is None whenever not every call in the
+    group has both a known price and real token counts, so a partial total
+    is never displayed as if it were complete."""
+    llm_spans = db.query(Span).filter(Span.name == _LLM_SPAN_NAME).all()
+    by_model: Dict[str, List[Span]] = {}
+    for s in llm_spans:
+        model = (s.attributes or {}).get("llm.model") or "unknown"
+        by_model.setdefault(model, []).append(s)
+
+    def _usage(span: Span, key: str) -> Optional[float]:
+        value = (span.attributes or {}).get(key)
+        return value if isinstance(value, (int, float)) else None
+
+    results = []
+    for model, spans in sorted(by_model.items()):
+        input_totals = [_usage(s, "llm.usage.input_tokens") for s in spans]
+        output_totals = [_usage(s, "llm.usage.output_tokens") for s in spans]
+        total_input = sum(v for v in input_totals if v is not None) if any(v is not None for v in input_totals) else None
+        total_output = sum(v for v in output_totals if v is not None) if any(v is not None for v in output_totals) else None
+
+        costs = [estimate_cost_usd(model, i, o) for i, o in zip(input_totals, output_totals)]
+        estimated_cost_usd_total = sum(costs) if costs and all(c is not None for c in costs) else None
+
+        results.append(
+            {
+                "model": model,
+                "call_count": len(spans),
+                "avg_duration_ms": round(sum(s.duration_ms for s in spans) / len(spans), 0),
+                "total_input_tokens": total_input,
+                "total_output_tokens": total_output,
+                "estimated_cost_usd": round(estimated_cost_usd_total, 4) if estimated_cost_usd_total is not None else None,
+            }
+        )
+    return results
+
+
+@app.get("/api/observability/logs")
+def observability_logs(
+    limit: int = 50,
+    offset: int = 0,
+    status: Optional[str] = None,
+    name_contains: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """A flat, filterable, paginated view over every recorded span (Part 4
+    "Logs") - unlike /traces (root spans only) or /traces/{id} (one trace's
+    tree), this is every span across every trace, newest first."""
+    query = db.query(Span)
+    if status:
+        query = query.filter(Span.status == status)
+    if name_contains:
+        query = query.filter(Span.name.contains(name_contains))
+
+    total = query.count()
+    spans = query.order_by(Span.start_time.desc()).offset(offset).limit(min(limit, 200)).all()
+    return {
+        "total": total,
+        "items": [
+            {
+                "span_id": s.span_id,
+                "trace_id": s.trace_id,
+                "name": s.name,
+                "start_time": s.start_time,
+                "duration_ms": s.duration_ms,
+                "status": s.status,
+                "status_message": s.status_message,
+            }
+            for s in spans
+        ],
+    }
