@@ -27,6 +27,7 @@ export interface TripSummary {
   origin: string | null;
   selected_accommodation_index: number | null;
   selected_flight_index: number | null;
+  traveler_count: number;
 }
 
 export interface FlightOffer {
@@ -43,6 +44,45 @@ export interface FlightOffer {
   source: "real";
   origin_query?: string;
   destination_query?: string;
+}
+
+export const RECOMMENDATION_TAGS = ["best_overall", "cheapest", "fastest", "best_value", "most_convenient"] as const;
+export type RecommendationTag = (typeof RECOMMENDATION_TAGS)[number];
+
+export interface ScoredFlightOffer {
+  index: number;
+  total_price: number | null;
+  within_budget: boolean;
+  duration_minutes: number | null;
+  stops: number | null;
+  price_per_hour: number | null;
+  composite_score: number;
+}
+
+export interface FlightRecommendations {
+  offers: ScoredFlightOffer[];
+  recommended: Partial<Record<RecommendationTag, number>>;
+  labels: Record<RecommendationTag, string>;
+  reasons: Partial<Record<RecommendationTag, string>>;
+  weights: Record<string, number>;
+  traveler_count: number;
+  max_flight_budget: number | null;
+  any_in_budget: boolean;
+  assumptions: string[];
+}
+
+export interface BudgetAllocation {
+  total_budget: number;
+  committed_amount: number;
+  remaining_after_committed: number;
+  budget_level: string;
+  traveler_count: number;
+  days: number;
+  allocation: Record<string, number>;
+  per_traveler: Record<string, number>;
+  per_day: Record<string, number>;
+  capped_categories: string[];
+  basis: "estimated";
 }
 
 export interface Attraction {
@@ -137,10 +177,14 @@ export interface TripDetail extends TripSummary {
   plan: TripPlan | null;
   errors: string[];
   budget_amount: number | null;
+  max_flight_budget_amount: number | null;
+  max_transport_budget_amount: number | null;
   model: string | null;
   framework: string | null;
   trace: TraceEntry[];
   share_token: string | null;
+  budget_allocation: BudgetAllocation | null;
+  flight_recommendations: FlightRecommendations | null;
 }
 
 export interface TripCreateRequest {
@@ -153,6 +197,9 @@ export interface TripCreateRequest {
   framework?: string;
   start_date?: string;
   origin?: string;
+  traveler_count?: number;
+  max_flight_budget_amount?: number;
+  max_transport_budget_amount?: number;
 }
 
 export interface ModelInfo {

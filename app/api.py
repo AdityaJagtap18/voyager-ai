@@ -89,6 +89,7 @@ from app.schemas import (  # noqa: E402
     RouteResponse,
     SelectIndexRequest,
     ShareLinkResponse,
+    TravelBudgetCapsUpdate,
     TripBudgetUpdate,
     TripCreateRequest,
     TripDetail,
@@ -98,6 +99,8 @@ from app.schemas import (  # noqa: E402
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 from agents.itinerary_agent import ItineraryAgent  # noqa: E402
+from services.budget_allocator import allocate_budget  # noqa: E402
+from services.flight_recommendations import recommend_flights  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -249,11 +252,54 @@ def list_trips(db: Session = Depends(get_db)):
     return db.query(Trip).order_by(Trip.created_at.desc()).all()
 
 
+def _committed_amount(trip_id: str, db: Session) -> float:
+    """Real money only: confirmed bookings with a cost, plus logged expenses -
+    the same definition TripBudget.tsx's frontend committed-total card uses.
+    Never includes pending/cancelled bookings or LLM-estimated price ranges."""
+    bookings = (
+        db.query(BookingModel)
+        .filter(BookingModel.trip_id == trip_id, BookingModel.status == "confirmed", BookingModel.cost.isnot(None))
+        .all()
+    )
+    expenses = db.query(ExpenseModel).filter(ExpenseModel.trip_id == trip_id).all()
+    return sum(b.cost for b in bookings) + sum(e.amount for e in expenses)
+
+
+def _attach_derived_recommendations(trip: Trip, db: Session) -> None:
+    """Computes budget_allocation/flight_recommendations fresh on every read
+    (Phase 11) and sets them as plain instance attributes - not DB columns,
+    just enough for Pydantic's from_attributes to pick them up on the
+    TripDetail response. None when there's nothing to compute from, never a
+    fabricated placeholder."""
+    trip.budget_allocation = None
+    if trip.budget_amount:
+        committed = _committed_amount(trip.id, db)
+        trip.budget_allocation = allocate_budget(
+            total_budget=trip.budget_amount,
+            budget_level=trip.budget,
+            days=trip.days,
+            traveler_count=trip.traveler_count or 1,
+            committed_amount=committed,
+            max_flight_budget=trip.max_flight_budget_amount,
+            max_transport_budget=trip.max_transport_budget_amount,
+        )
+
+    trip.flight_recommendations = None
+    flights = (trip.plan or {}).get("flights") if trip.plan else None
+    if flights:
+        trip.flight_recommendations = recommend_flights(
+            flights,
+            traveler_count=trip.traveler_count or 1,
+            max_flight_budget=trip.max_flight_budget_amount,
+        )
+
+
 @app.get("/api/trips/{trip_id}", response_model=TripDetail)
 def get_trip(trip_id: str, db: Session = Depends(get_db)):
     trip = db.get(Trip, trip_id)
     if trip is None:
         raise HTTPException(status_code=404, detail="Trip not found")
+    _attach_derived_recommendations(trip, db)
     return trip
 
 
@@ -306,6 +352,9 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         status="planning",
         start_date=payload.start_date,
         origin=payload.origin,
+        traveler_count=payload.traveler_count,
+        max_flight_budget_amount=payload.max_flight_budget_amount,
+        max_transport_budget_amount=payload.max_transport_budget_amount,
     )
     db.add(trip)
     db.commit()
@@ -327,6 +376,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         trip.errors = [str(exc)]
         db.commit()
         db.refresh(trip)
+        _attach_derived_recommendations(trip, db)
         return trip
 
     if result.get("success"):
@@ -340,6 +390,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
     return trip
 
 
@@ -356,6 +407,27 @@ def update_trip_budget(trip_id: str, payload: TripBudgetUpdate, db: Session = De
     trip.budget_amount = payload.budget_amount
     db.commit()
     db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
+    return trip
+
+
+@app.patch("/api/trips/{trip_id}/budget-caps", response_model=TripDetail)
+def update_budget_caps(trip_id: str, payload: TravelBudgetCapsUpdate, db: Session = Depends(get_db)):
+    """Sets traveler_count and/or per-category flight/transport budget
+    ceilings independently of the overall budget_amount target. Recomputes
+    budget_allocation and flight_recommendations fresh (same derived fields
+    get_trip returns) - no itinerary/plan regeneration, since none of these
+    fields feed into plan generation."""
+    trip = _get_trip_or_404(trip_id, db)
+    if payload.traveler_count is not None:
+        trip.traveler_count = payload.traveler_count
+    if payload.max_flight_budget_amount is not None:
+        trip.max_flight_budget_amount = payload.max_flight_budget_amount
+    if payload.max_transport_budget_amount is not None:
+        trip.max_transport_budget_amount = payload.max_transport_budget_amount
+    db.commit()
+    db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
     return trip
 
 
@@ -385,6 +457,7 @@ def select_flight(trip_id: str, payload: SelectIndexRequest, db: Session = Depen
     trip.selected_flight_index = payload.index
     db.commit()
     db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
     return trip
 
 
@@ -420,6 +493,7 @@ def select_accommodation(trip_id: str, payload: SelectIndexRequest, db: Session 
     trip.selected_accommodation_index = payload.index
     db.commit()
     db.refresh(trip)
+    _attach_derived_recommendations(trip, db)
     return trip
 
 

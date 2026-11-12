@@ -6,7 +6,7 @@ import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
 import TripDocuments from "../components/TripDocuments";
 import TripShare from "../components/TripShare";
-import type { TripDetail as TripDetailType } from "../types";
+import type { TripDetail as TripDetailType, RecommendationTag } from "../types";
 
 type Tab =
   | "itinerary"
@@ -166,7 +166,14 @@ export default function TripDetail() {
           </div>
 
           {tab === "bookings" && <TripBookings tripId={trip.id} />}
-          {tab === "budget" && <TripBudget tripId={trip.id} budgetAmount={trip.budget_amount} plan={trip.plan} />}
+          {tab === "budget" && (
+            <TripBudget
+              tripId={trip.id}
+              budgetAmount={trip.budget_amount}
+              plan={trip.plan}
+              budgetAllocation={trip.budget_allocation}
+            />
+          )}
           {tab === "documents" && <TripDocuments tripId={trip.id} />}
           {tab === "share" && <TripShare tripId={trip.id} initialToken={trip.share_token} />}
 
@@ -229,6 +236,26 @@ export default function TripDetail() {
                     : "Add a departure city and start date to a new trip to ground it in a real flight search."}
                 </p>
               )}
+              {trip.flight_recommendations && (
+                <div className="rounded-xl2 border border-brand-100 bg-brand-50/60 p-3 text-xs text-ink-700">
+                  <p className="font-semibold text-brand-700">
+                    Recommendations use {trip.flight_recommendations.traveler_count} traveler
+                    {trip.flight_recommendations.traveler_count === 1 ? "" : "s"}
+                    {trip.flight_recommendations.max_flight_budget != null &&
+                      ` · flight budget cap ${trip.flight_recommendations.max_flight_budget}`}
+                  </p>
+                  {!trip.flight_recommendations.any_in_budget && trip.flight_recommendations.max_flight_budget != null && (
+                    <p className="mt-1 text-amber-700">
+                      No offer fits under the flight budget cap — showing the closest options for comparison anyway.
+                    </p>
+                  )}
+                  {trip.flight_recommendations.assumptions.map((a, i) => (
+                    <p key={i} className="mt-1 text-ink-500">
+                      {a}
+                    </p>
+                  ))}
+                </div>
+              )}
               {trip.plan.flights?.map((f, i) => {
                 const bookingUrl =
                   trip.origin && trip.start_date
@@ -237,11 +264,39 @@ export default function TripDetail() {
                       )}`
                     : null;
                 const isSelected = trip.selected_flight_index === i;
+                const recs = trip.flight_recommendations;
+                const tags = recs
+                  ? (Object.entries(recs.recommended) as [RecommendationTag, number | undefined][])
+                      .filter(([, idx]) => idx === i)
+                      .map(([tag]) => tag)
+                  : [];
+                const scored = recs?.offers.find((o) => o.index === i);
                 return (
                   <div
                     key={i}
-                    className={`rounded-xl2 border bg-white p-4 ${isSelected ? "border-brand-500 ring-1 ring-brand-500" : "border-ink-900/5"}`}
+                    className={`rounded-xl2 border bg-white shadow-card p-4 ${isSelected ? "border-brand-500 ring-1 ring-brand-500" : "border-ink-900/5"}`}
                   >
+                    {tags.length > 0 && (
+                      <div className="mb-2 flex flex-wrap gap-1.5">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag}
+                            title={recs?.reasons[tag]}
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                              tag === "best_overall" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-700"
+                            }`}
+                          >
+                            {recs?.labels[tag]}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {tags.length > 0 && recs && (
+                      <p className="mb-2 text-xs text-ink-500">{recs.reasons[tags[0]]}</p>
+                    )}
+                    {scored && scored.within_budget === false && (
+                      <p className="mb-2 text-xs font-medium text-rose-600">Over your flight budget cap</p>
+                    )}
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <p className="font-semibold">
                         {f.airline ?? "Unknown airline"} · {f.origin} → {f.destination}
@@ -269,6 +324,11 @@ export default function TripDetail() {
                       {f.price ?? "Price unavailable"} · {f.stops === 0 ? "Nonstop" : `${f.stops} stop(s)`}
                       {f.duration_minutes != null && ` · ${Math.round(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`}
                     </p>
+                    {scored?.total_price != null && recs && recs.traveler_count > 1 && (
+                      <p className="text-xs text-ink-500">
+                        {f.currency} {scored.total_price} total for {recs.traveler_count} travelers
+                      </p>
+                    )}
                     <p className="mt-1 text-xs text-ink-500">
                       Departs {formatDateTime(f.departure)} · Arrives {formatDateTime(f.arrival)}
                     </p>

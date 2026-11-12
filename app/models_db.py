@@ -48,6 +48,15 @@ class Trip(Base):
     selected_accommodation_index = Column(Integer, nullable=True)
     selected_flight_index = Column(Integer, nullable=True)
 
+    # Phase 11 (budget-aware flight/transport recommendations): how many
+    # travelers this trip is for - flight offers from services/flights_api.py
+    # are priced per traveler, so this is needed to turn a quoted fare into a
+    # real total cost for the group. Optional per-category budget ceilings,
+    # independent of the overall `budget_amount` target below.
+    traveler_count = Column(Integer, nullable=False, default=1)
+    max_flight_budget_amount = Column(Float, nullable=True)
+    max_transport_budget_amount = Column(Float, nullable=True)
+
     status = Column(String(20), nullable=False, default="planning")  # planning | complete | failed
     plan = Column(JSON, nullable=True)  # {attractions, itinerary, restaurants, accommodations}
     errors = Column(JSON, nullable=False, default=list)

@@ -21,6 +21,8 @@ export default function PlanTrip() {
   const [searchParams] = useSearchParams();
   const [destination, setDestination] = useState(() => searchParams.get("destination") ?? "");
   const [origin, setOrigin] = useState("");
+  const [travelerCount, setTravelerCount] = useState(1);
+  const [maxFlightBudget, setMaxFlightBudget] = useState("");
   const [days, setDays] = useState(3);
   const [tripType, setTripType] = useState<string>(TRIP_TYPES[0]);
   const [budget, setBudget] = useState<string>("mid-range");
@@ -62,6 +64,8 @@ export default function PlanTrip() {
         framework: framework || undefined,
         start_date: startDate || undefined,
         origin: origin || undefined,
+        traveler_count: travelerCount,
+        max_flight_budget_amount: maxFlightBudget ? Number(maxFlightBudget) : undefined,
       });
       navigate(`/trips/${trip.id}`);
     } catch (e) {
@@ -140,6 +144,32 @@ export default function PlanTrip() {
                 className={fieldClass}
               />
             </label>
+
+            <div className="grid grid-cols-2 gap-4">
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Travelers
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={travelerCount}
+                  onChange={(e) => setTravelerCount(Number(e.target.value))}
+                  className={fieldClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm font-medium">
+                Max flight budget (₹){" "}
+                <span className="font-normal text-ink-500">(optional)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={maxFlightBudget}
+                  onChange={(e) => setMaxFlightBudget(e.target.value)}
+                  placeholder="e.g. 15000"
+                  className={fieldClass}
+                />
+              </label>
+            </div>
           </div>
 
           <div className="flex flex-col gap-4 border-t border-ink-900/5 pt-5">

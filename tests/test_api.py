@@ -874,3 +874,155 @@ def test_maps_route_502_on_provider_error(monkeypatch):
         params={"origin_lat": 19.076, "origin_lng": 72.8777, "dest_lat": 15.4909, "dest_lng": 73.8278},
     )
     assert resp.status_code == 502
+
+
+# --- Phase 11: budget-aware flight & transportation recommendations --------------
+
+def test_create_trip_defaults_traveler_count_to_one(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    fake_orchestrator = MagicMock()
+    fake_orchestrator.plan_trip.return_value = {"success": True, "plan": {"attractions": []}, "errors": [], "trace": []}
+    monkeypatch.setattr(api_module, "get_orchestrator", lambda *a, **k: fake_orchestrator)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India", "days": 3, "trip_type": "foodie", "budget": "mid-range",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["traveler_count"] == 1
+
+
+def test_create_trip_accepts_traveler_count_and_budget_caps(monkeypatch):
+    monkeypatch.setattr(api_module.Config, "OPENAI_API_KEY", "sk-test")
+    fake_orchestrator = MagicMock()
+    fake_orchestrator.plan_trip.return_value = {"success": True, "plan": {"attractions": []}, "errors": [], "trace": []}
+    monkeypatch.setattr(api_module, "get_orchestrator", lambda *a, **k: fake_orchestrator)
+
+    resp = client.post("/api/trips", json={
+        "destination": "Goa, India", "days": 3, "trip_type": "foodie", "budget": "mid-range",
+        "traveler_count": 4, "max_flight_budget_amount": 20000, "max_transport_budget_amount": 5000,
+    })
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["traveler_count"] == 4
+    assert body["max_flight_budget_amount"] == 20000
+    assert body["max_transport_budget_amount"] == 5000
+
+
+def test_get_trip_has_no_budget_allocation_without_a_budget_target():
+    trip_id = _create_test_trip()
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.status_code == 200
+    assert resp.json()["budget_allocation"] is None
+
+
+def test_get_trip_computes_budget_allocation_once_budget_is_set():
+    trip_id = _create_test_trip()
+    client.patch(f"/api/trips/{trip_id}", json={"budget_amount": 50000})
+
+    resp = client.get(f"/api/trips/{trip_id}")
+    allocation = resp.json()["budget_allocation"]
+    assert allocation is not None
+    assert allocation["total_budget"] == 50000
+    assert allocation["committed_amount"] == 0
+    assert allocation["basis"] == "estimated"
+
+
+def test_budget_allocation_subtracts_confirmed_bookings_and_expenses():
+    trip_id = _create_test_trip()
+    client.patch(f"/api/trips/{trip_id}", json={"budget_amount": 50000})
+    client.post(f"/api/trips/{trip_id}/bookings", json={"type": "flight", "title": "Flight", "cost": 8000})
+    booking_id = client.get(f"/api/trips/{trip_id}/bookings").json()[0]["id"]
+    client.patch(f"/api/trips/{trip_id}/bookings/{booking_id}", json={"status": "confirmed"})
+    client.post(f"/api/trips/{trip_id}/expenses", json={"category": "food", "amount": 1500})
+
+    resp = client.get(f"/api/trips/{trip_id}")
+    allocation = resp.json()["budget_allocation"]
+    assert allocation["committed_amount"] == 9500
+    assert allocation["remaining_after_committed"] == 40500
+
+
+def test_pending_bookings_are_not_counted_as_committed():
+    trip_id = _create_test_trip()
+    client.patch(f"/api/trips/{trip_id}", json={"budget_amount": 50000})
+    client.post(f"/api/trips/{trip_id}/bookings", json={"type": "flight", "title": "Flight", "cost": 8000})
+    # left as "pending" - never confirmed
+
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["budget_allocation"]["committed_amount"] == 0
+
+
+def test_get_trip_has_flight_recommendations_when_plan_has_real_flights():
+    plan = {
+        "flights": [
+            {"price_raw": 5000, "currency": "INR", "duration_minutes": 180, "stops": 0, "source": "real"},
+            {"price_raw": 4000, "currency": "INR", "duration_minutes": 300, "stops": 1, "source": "real"},
+        ]
+    }
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    recs = resp.json()["flight_recommendations"]
+    assert recs is not None
+    assert recs["recommended"]["cheapest"] == 1
+    assert recs["recommended"]["fastest"] == 0
+    assert "reasons" in recs
+
+
+def test_get_trip_has_no_flight_recommendations_without_flights():
+    trip_id = _create_test_trip(plan={"attractions": []})
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["flight_recommendations"] is None
+
+
+def test_flight_recommendations_use_traveler_count_for_total_price():
+    plan = {"flights": [{"price_raw": 5000, "currency": "INR", "duration_minutes": 180, "stops": 0}]}
+    db = TestingSessionLocal()
+    trip = api_module.Trip(
+        destination="Goa, India", days=3, trip_type="foodie", budget="mid-range", status="complete",
+        plan=plan, traveler_count=3,
+    )
+    db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    trip_id = trip.id
+    db.close()
+
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["flight_recommendations"]["offers"][0]["total_price"] == 15000
+
+
+def test_update_budget_caps_endpoint():
+    trip_id = _create_test_trip()
+    resp = client.patch(f"/api/trips/{trip_id}/budget-caps", json={
+        "traveler_count": 2, "max_flight_budget_amount": 15000,
+    })
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["traveler_count"] == 2
+    assert body["max_flight_budget_amount"] == 15000
+    assert body["max_transport_budget_amount"] is None  # untouched
+
+
+def test_update_budget_caps_partial_update_does_not_clear_other_fields():
+    trip_id = _create_test_trip()
+    client.patch(f"/api/trips/{trip_id}/budget-caps", json={"max_flight_budget_amount": 15000})
+    resp = client.patch(f"/api/trips/{trip_id}/budget-caps", json={"traveler_count": 5})
+    assert resp.json()["max_flight_budget_amount"] == 15000
+    assert resp.json()["traveler_count"] == 5
+
+
+def test_select_flight_still_leaves_plan_untouched_with_recommendations_present():
+    """Regression guard: adding flight_recommendations as a derived field must
+    not change the existing select-flight "touches nothing else" guarantee."""
+    plan = {
+        "flights": [
+            {"price_raw": 100, "currency": "USD", "duration_minutes": 120, "stops": 0, "source": "real"},
+            {"price_raw": 200, "currency": "USD", "duration_minutes": 90, "stops": 0, "source": "real"},
+        ],
+    }
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.patch(f"/api/trips/{trip_id}/select-flight", json={"index": 1})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["selected_flight_index"] == 1
+    assert body["plan"] == plan
+    assert body["flight_recommendations"] is not None

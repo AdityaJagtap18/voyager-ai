@@ -1,7 +1,16 @@
 import { FormEvent, useEffect, useState } from "react";
 import Spinner from "./Spinner";
 import { api } from "../api/client";
-import { EXPENSE_CATEGORIES, type Booking, type TripExpense, type TripPlan } from "../types";
+import { EXPENSE_CATEGORIES, type Booking, type BudgetAllocation, type TripExpense, type TripPlan } from "../types";
+
+const CATEGORY_LABELS: Record<string, string> = {
+  flights: "Flights",
+  accommodation: "Accommodation",
+  transport: "Transport",
+  food: "Food",
+  activities: "Activities",
+  misc: "Misc",
+};
 
 function cheapestReal<T extends { source?: unknown }>(items: T[] | undefined, priceOf: (item: T) => number | null) {
   if (!items) return null;
@@ -19,10 +28,12 @@ export default function TripBudget({
   tripId,
   budgetAmount,
   plan,
+  budgetAllocation,
 }: {
   tripId: string;
   budgetAmount: number | null;
   plan: TripPlan | null;
+  budgetAllocation?: BudgetAllocation | null;
 }) {
   const [expenses, setExpenses] = useState<TripExpense[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -143,6 +154,38 @@ export default function TripBudget({
           costs aren't included — this is real, user-entered money only, never mixed with an LLM guess.
         </p>
       </div>
+
+      {budgetAllocation && (
+        <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Estimated budget allocation</p>
+          <p className="mt-1 text-xs text-ink-500">
+            A deterministic split of what's left (₹{budgetAllocation.remaining_after_committed.toLocaleString()}) after
+            committed spend, based on the "{budgetAllocation.budget_level}" level — a planning guide, not a forecast
+            of actual spend.
+          </p>
+          <div className="mt-3 flex flex-col gap-2">
+            {Object.entries(budgetAllocation.allocation).map(([cat, amount]) => {
+              const pctOfRemaining = budgetAllocation.remaining_after_committed
+                ? Math.round((amount / budgetAllocation.remaining_after_committed) * 100)
+                : 0;
+              return (
+                <div key={cat} className="flex items-center gap-3">
+                  <span className="w-28 shrink-0 text-xs font-medium">{CATEGORY_LABELS[cat] ?? cat}</span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
+                    <div className="h-full rounded-full bg-brand-400" style={{ width: `${pctOfRemaining}%` }} />
+                  </div>
+                  <span className="w-20 shrink-0 text-right text-xs text-ink-500">₹{amount.toLocaleString()}</span>
+                  {budgetAllocation.capped_categories.includes(cat) && (
+                    <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+                      capped
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleAddExpense} className="flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
         <label className="flex flex-col gap-1 text-xs font-medium">

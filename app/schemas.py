@@ -31,6 +31,15 @@ class TripCreateRequest(BaseModel):
         description="Optional departure city/airport. When set together with start_date and RAPIDAPI_KEY is "
         "configured, the itinerary is grounded in a real flight search instead of having no flight data at all.",
     )
+    traveler_count: int = Field(
+        1, ge=1, le=20, description="Number of travelers - flight fares are per-traveler, so this affects total cost."
+    )
+    max_flight_budget_amount: Optional[float] = Field(
+        None, ge=0, description="Optional ceiling on flight spend, independent of the overall budget_amount."
+    )
+    max_transport_budget_amount: Optional[float] = Field(
+        None, ge=0, description="Optional ceiling on transportation spend, independent of the overall budget_amount."
+    )
 
 
 class TripSummary(BaseModel):
@@ -45,6 +54,7 @@ class TripSummary(BaseModel):
     origin: Optional[str] = None
     selected_accommodation_index: Optional[int] = None
     selected_flight_index: Optional[int] = None
+    traveler_count: int = 1
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,10 +64,17 @@ class TripDetail(TripSummary):
     plan: Optional[Dict[str, Any]] = None
     errors: List[str] = Field(default_factory=list)
     budget_amount: Optional[float] = None
+    max_flight_budget_amount: Optional[float] = None
+    max_transport_budget_amount: Optional[float] = None
     model: Optional[str] = None
     framework: Optional[str] = None
     trace: List[Dict[str, Any]] = Field(default_factory=list)
     share_token: Optional[str] = None
+    # Derived, not a DB column - computed fresh on every read by api.py from
+    # plan.flights + budget/traveler fields (app/services/flight_recommendations.py,
+    # app/services/budget_allocator.py). None when there's nothing to compute from.
+    budget_allocation: Optional[Dict[str, Any]] = None
+    flight_recommendations: Optional[Dict[str, Any]] = None
 
 
 class SelectIndexRequest(BaseModel):
@@ -92,6 +109,15 @@ class AgentInfoResponse(BaseModel):
 
 class TripBudgetUpdate(BaseModel):
     budget_amount: float = Field(..., ge=0)
+
+
+class TravelBudgetCapsUpdate(BaseModel):
+    """Independent of the overall budget_amount target - lets a user cap just
+    the flight or transport category, or correct the traveler count after
+    trip creation. Every field optional: only what's provided is changed."""
+    traveler_count: Optional[int] = Field(None, ge=1, le=20)
+    max_flight_budget_amount: Optional[float] = Field(None, ge=0)
+    max_transport_budget_amount: Optional[float] = Field(None, ge=0)
 
 
 class BookingCreateRequest(BaseModel):

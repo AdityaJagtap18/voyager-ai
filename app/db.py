@@ -50,6 +50,20 @@ def _add_missing_sqlite_columns():
             if column.name not in existing:
                 col_type = column.type.compile(engine.dialect)
                 conn.exec_driver_sql(f"ALTER TABLE trips ADD COLUMN {column.name} {col_type}")
+
+            # SQLite's ALTER TABLE ADD COLUMN always backfills existing rows
+            # with NULL, never the Python-side Column(default=...) - that
+            # default only applies to rows SQLAlchemy itself inserts. Backfill
+            # any still-NULL rows for a simple scalar default (e.g.
+            # traveler_count=1) every time, not just the run that added the
+            # column, so a row left over from before this backfill existed
+            # still gets fixed. A non-nullable response schema field would
+            # otherwise choke on NULL from such a row.
+            default = column.default.arg if column.default is not None else None
+            if default is not None and not callable(default):
+                conn.exec_driver_sql(
+                    f"UPDATE trips SET {column.name} = ? WHERE {column.name} IS NULL", (default,)
+                )
         conn.commit()
 
 

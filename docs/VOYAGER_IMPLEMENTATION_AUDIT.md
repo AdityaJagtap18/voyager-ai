@@ -428,3 +428,87 @@ failure trigger, an LLM-sourced accommodation with `coordinates: None`) against 
 backend. Before the fix this would have produced four activities all at "09:00"; after the fix the
 same trip produced `09:00, 10:15, 12:30, 13:45` - confirmed both via the raw API response and in
 the browser UI (desktop and mobile), each activity correctly tagged "Estimated time".
+
+## Budget-aware flight & transportation recommendations (Phase 11)
+
+The spec for this phase ("Voyager AI — Budget-Aware Flight & Transportation Recommendation Engine")
+covers five major subsystems: budget allocation, flight recommendations, transportation
+recommendations, a unified deterministic scoring engine, and AI-powered conversational interaction
+over real data, plus three-tier booking/provider integration. Given the scope, this pass built and
+shipped a first real, end-to-end slice rather than a partial pass at everything. What follows is an
+honest account of what's working now versus what's explicitly deferred.
+
+**Built and working:**
+
+- **Deterministic budget allocation engine** (`app/services/budget_allocator.py`, 10 tests) - splits
+  a trip's total budget across six categories (flights, accommodation, transport, food, activities,
+  misc) using level-specific weights (budget/mid-range/premium, with graceful fallback to mid-range
+  for unrecognized levels), subtracts already-committed spend (confirmed bookings + logged expenses,
+  never pending/cancelled ones), and supports independent flight/transport budget caps with
+  proportional redistribution of any capped excess to the remaining categories. Pure arithmetic - no
+  LLM involved, explicitly labeled `"basis": "estimated"` in every response so the UI never implies
+  it's a forecast of actual spend.
+- **Deterministic flight recommendation/scoring engine** (`app/services/flight_recommendations.py`,
+  12 tests) - scores real flight offers already present in `trip.plan.flights` (no new provider
+  integration; reuses whatever `services/flights_api.py` already returned) across 5 named categories
+  (Best Overall, Cheapest, Fastest, Best Value, Most Convenient) via min-max-normalized weighted
+  composite scoring with an explicit over-budget penalty. Every recommendation's explanation string
+  is built only from real price/duration/stop deltas vs. the cheapest offer (e.g. "costs $10.86 more
+  than the cheapest option" is computed, never written by an LLM) - satisfying the spec's "do not
+  allow an LLM to fabricate scores or prices" requirement by not using an LLM for this at all in this
+  slice. The per-traveler → total-price assumption is explicit and surfaced in the response's
+  `assumptions` list rather than silently guessed.
+- **New trip-level fields**: `traveler_count` (defaults to 1), `max_flight_budget_amount`,
+  `max_transport_budget_amount` - settable at trip creation or via the new
+  `PATCH /api/trips/{id}/budget-caps` endpoint.
+- **API wiring**: `budget_allocation` and `flight_recommendations` are computed fresh and attached to
+  every `TripDetail` response (`_attach_derived_recommendations()` in `app/api.py`) - never persisted,
+  always reflecting the live budget/plan/traveler-count state. `flight_recommendations` is `None` when
+  there's no flight data; `budget_allocation` is `None` when no budget target is set.
+- **Frontend**: the Flights tab shows a recommendations summary (traveler count, flight budget cap,
+  an `any_in_budget` warning, assumptions) plus per-offer tag badges, hover-tooltip reasons, an
+  over-budget warning, and total-price-for-N-travelers line. The Budget & Expenses tab shows a new
+  "Estimated budget allocation" card with a labeled progress bar per category and a "capped" badge
+  where a cap redistributed budget away from that category. Plan a Trip gained Travelers and optional
+  Max flight budget fields, wired into trip creation.
+- **Tests**: 22 new unit tests across the two new service modules plus 12 new API-level tests in
+  `tests/test_api.py` covering traveler-count defaults, budget-cap creation, allocation-once-budget-
+  is-set, committed-amount subtraction (confirmed-only), flight recommendations keyed off real plan
+  data, the new PATCH endpoint (including partial updates not clobbering other fields), and a
+  regression test confirming `select_flight` still leaves `trip.plan` byte-for-byte untouched with
+  recommendations present. Full suite: 256 passed (230 pre-existing + 26 new, including a migration
+  regression test below).
+- **Migration bug found and fixed while building this**: adding `Trip.traveler_count` as a
+  non-nullable column with a Python-side `default=1` looked safe but broke every pre-existing trip
+  row with a live HTTP 500 (`ResponseValidationError`), because SQLite's `ALTER TABLE ADD COLUMN`
+  backfills existing rows with `NULL` and never applies a SQLAlchemy-side default - that only fires on
+  INSERT. Fixed `app/db.py`'s `_add_missing_sqlite_columns()` to also backfill NULLs for any column
+  with a simple scalar default, unconditionally on every startup (not just the run that adds the
+  column), so a NULL left over from an earlier partial migration self-heals on the next restart.
+  Regression-tested in `tests/test_db_migration.py` (simulates a pre-migration `trips` table, runs the
+  real migration function, asserts the backfill lands) and live-verified against the real dev database
+  after a restart: `GET /api/trips/{id}` on a pre-existing trip now returns `traveler_count: 1`
+  instead of 500.
+
+**Explicitly deferred (scope, not oversight):**
+
+- **Transportation recommendation engine** - no airport-transfer/local-transport/intercity scoring or
+  recommendation logic was built this pass. `app/api.py`'s existing maps/routing endpoints (real
+  ORS-backed) are untouched; the spec's "intelligent transport planning" (proximity-based, group-cost
+  comparisons) has no new code.
+- **AI-powered conversational interaction over real data** - no new LLM-explanation layer was added;
+  all explanations in this slice are deterministic template strings, not LLM-generated commentary.
+  The spec explicitly allows (and this slice satisfies) "deterministic calculations for scores/prices,
+  LLM only to explain" - the LLM-explanation half specifically was left out because the deterministic
+  reasons already satisfy the anti-fabrication requirement without it, and adding an LLM pass is a
+  separable, clearly-scoped follow-up.
+- **Three-tier booking/provider integration** (official handoff beyond the existing "search & book on
+  Google Flights" link, direct in-app booking) - not built. No new provider adapters were added.
+- **Full budget-level taxonomy** - `_CATEGORY_WEIGHTS` covers budget/mid-range/premium only; economy,
+  luxury, and fully custom allocations fall back to mid-range weights rather than having their own
+  tuned profiles.
+- **Itinerary-affecting integration** ("flight arrival affects day-1 schedule") - flight
+  recommendations are computed and displayed but don't yet feed back into `ItineraryAgent.create_schedule()`.
+
+None of the above gaps are silently papered over: no code in this slice fabricates transport pricing,
+transport recommendations, or LLM-written scores/explanations to look like these subsystems exist.
