@@ -156,6 +156,31 @@ export interface TransportationRoute {
   source: "real";
 }
 
+export type TransportMode = "walk" | "cycle" | "taxi_or_transit" | "dedicated_transfer";
+
+export interface AirportTransferRecommendation extends TransportationRoute {
+  recommended_mode: TransportMode;
+  reason: string;
+}
+
+export interface LocalTransportHop {
+  day: number;
+  from: string | null;
+  to: string | null;
+  distance_km: number;
+  duration_h: number | null;
+  recommended_mode: TransportMode;
+  reason: string;
+  source: "real";
+}
+
+export interface TransportRecommendations {
+  airport_transfer: AirportTransferRecommendation | null;
+  local_transport: LocalTransportHop[];
+  intercity_transport: null;
+  assumptions: string[];
+}
+
 export interface TripPlan {
   attractions: Attraction[];
   itinerary: ItineraryResult;
@@ -185,6 +210,7 @@ export interface TripDetail extends TripSummary {
   share_token: string | null;
   budget_allocation: BudgetAllocation | null;
   flight_recommendations: FlightRecommendations | null;
+  transport_recommendations: TransportRecommendations | null;
 }
 
 export interface TripCreateRequest {

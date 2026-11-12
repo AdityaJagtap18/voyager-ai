@@ -6,7 +6,14 @@ import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
 import TripDocuments from "../components/TripDocuments";
 import TripShare from "../components/TripShare";
-import type { TripDetail as TripDetailType, RecommendationTag } from "../types";
+import type { TripDetail as TripDetailType, RecommendationTag, TransportMode } from "../types";
+
+const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
+  walk: "Walk",
+  cycle: "Cycle",
+  taxi_or_transit: "Taxi / transit",
+  dedicated_transfer: "Dedicated transfer",
+};
 
 type Tab =
   | "itinerary"
@@ -354,7 +361,7 @@ export default function TripDetail() {
 
           {tab === "transportation" && trip.plan && (
             <div className="flex flex-col gap-3">
-              {!trip.plan.transportation && (
+              {!trip.plan.transportation && !trip.transport_recommendations?.local_transport.length && (
                 <p className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-sm text-ink-500">
                   No real transfer route for this trip. This only covers an airport-to-accommodation
                   drive, and only once accommodation is chosen — it needs an accommodation with coordinates.
@@ -362,6 +369,17 @@ export default function TripDetail() {
                   for those is shown here, real or estimated.
                 </p>
               )}
+
+              {trip.transport_recommendations && (
+                <div className="rounded-xl2 border border-brand-100 bg-brand-50/50 p-4 text-xs text-ink-600">
+                  {trip.transport_recommendations.assumptions.map((a, i) => (
+                    <p key={i} className={i > 0 ? "mt-1" : ""}>
+                      {a}
+                    </p>
+                  ))}
+                </div>
+              )}
+
               {trip.plan.transportation && (
                 <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -376,10 +394,43 @@ export default function TripDetail() {
                     {trip.plan.transportation.distance_km} km · {trip.plan.transportation.duration_h.toFixed(1)}h
                     driving
                   </p>
+                  {trip.transport_recommendations?.airport_transfer && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
+                        Recommended: {TRANSPORT_MODE_LABELS[trip.transport_recommendations.airport_transfer.recommended_mode]}
+                      </span>
+                      <p className="text-xs text-ink-500">{trip.transport_recommendations.airport_transfer.reason}</p>
+                    </div>
+                  )}
                   <p className="mt-2 text-xs text-ink-400">
                     A real routed distance/duration, not a fare — no rental-car, taxi, or public-transit
                     pricing provider is integrated, so no price is shown or estimated.
                   </p>
+                </div>
+              )}
+
+              {trip.transport_recommendations && trip.transport_recommendations.local_transport.length > 0 && (
+                <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">
+                    Local transport between stops
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {trip.transport_recommendations.local_transport.map((hop, i) => (
+                      <div key={i} className="flex flex-wrap items-center gap-2 border-t border-ink-900/5 pt-2 first:border-t-0 first:pt-0">
+                        <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
+                          Day {hop.day}
+                        </span>
+                        <p className="text-sm">
+                          {hop.from ?? "Start"} → {hop.to ?? "End"}{" "}
+                          <span className="text-ink-500">({hop.distance_km} km)</span>
+                        </p>
+                        <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800">
+                          {TRANSPORT_MODE_LABELS[hop.recommended_mode]}
+                        </span>
+                        <p className="w-full text-xs text-ink-400">{hop.reason}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

@@ -101,6 +101,7 @@ from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
 from agents.itinerary_agent import ItineraryAgent  # noqa: E402
 from services.budget_allocator import allocate_budget  # noqa: E402
 from services.flight_recommendations import recommend_flights  # noqa: E402
+from services.transport_recommendations import recommend_transport  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -292,6 +293,12 @@ def _attach_derived_recommendations(trip: Trip, db: Session) -> None:
             traveler_count=trip.traveler_count or 1,
             max_flight_budget=trip.max_flight_budget_amount,
         )
+
+    trip.transport_recommendations = None
+    if trip.plan:
+        transportation = trip.plan.get("transportation")
+        itinerary_days = (trip.plan.get("itinerary") or {}).get("itinerary")
+        trip.transport_recommendations = recommend_transport(transportation, itinerary_days)
 
 
 @app.get("/api/trips/{trip_id}", response_model=TripDetail)

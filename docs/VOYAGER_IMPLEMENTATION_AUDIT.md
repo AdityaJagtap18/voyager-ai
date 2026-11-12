@@ -512,3 +512,47 @@ honest account of what's working now versus what's explicitly deferred.
 
 None of the above gaps are silently papered over: no code in this slice fabricates transport pricing,
 transport recommendations, or LLM-written scores/explanations to look like these subsystems exist.
+
+## Transportation recommendation engine (Phase 11b)
+
+Audited the existing transportation implementation before building: `app/agents/transport_agent.py`
+(Phase 10) finds one real ORS-routed airport-to-accommodation driving transfer (distance/duration,
+never a price, since no taxi/rental/transit provider is integrated), and `app/agents/itinerary_agent.py`
+separately computes real driving-profile distances between consecutive scheduled stops within a day,
+attaching them to each activity as `travel_after: {distance_km, duration_h}`. Neither of these was
+previously surfaced as a *recommendation* - the frontend just printed the raw airport-transfer numbers,
+and the inter-stop distances were only ever used internally to compute travel time, never shown.
+
+**Built**: `app/services/transport_recommendations.py` (18 tests) - a deterministic mode-classification
+layer over both real data sources. `classify_distance()` maps a real distance to a recommended mode
+(walk / cycle / taxi_or_transit / dedicated_transfer) via fixed km thresholds, never a fare or live
+availability. `recommend_airport_transfer()` annotates the existing real transfer with a recommended
+mode + reason (collapsing an implausible "walk the airport transfer" result into taxi_or_transit).
+`recommend_local_transport()` walks every real `travel_after` hop already computed by the itinerary
+agent and returns one mode recommendation per hop - genuinely new information, not previously computed
+or shown anywhere, but built entirely from data the itinerary agent already had. `recommend_transport()`
+combines both into one `transport_recommendations` response (`None` when there's no real data on either
+side) with an explicit `assumptions` list naming the no-pricing-provider limitation.
+
+**API**: wired into the same `_attach_derived_recommendations()` helper as the Phase 11 budget/flight
+work; `TripDetail.transport_recommendations` is computed fresh from `trip.plan.transportation` and
+`trip.plan.itinerary.itinerary` on every read, never persisted. 5 new API-level tests in `tests/test_api.py`.
+
+**Frontend**: the Transportation tab now shows the assumptions banner, a "Recommended: <mode>" badge
++ reason on the airport transfer card, and a new "Local transport between stops" card listing every
+real inter-stop hop with its day, distance, recommended mode, and reason. Verified live at desktop and
+mobile widths against a throwaway trip seeded with synthetic-but-realistically-shaped plan data (this
+dev environment has no `ORS_API_KEY` configured, so no trip here has real routed data to exercise this
+against naturally - the throwaway trip was deleted after verification).
+
+**Explicitly out of scope, by design, not oversight**:
+- **Intercity transport** - `intercity_transport` is always `None`. This app models a trip as a single
+  destination, so there is no second city for an intercity leg to connect to; this isn't a provider gap,
+  it's a mismatch with the current data model. Multi-city trip support would be a separate, larger change.
+- **Group-cost comparisons** and **any fare/price** - impossible to do honestly without a rental-car,
+  taxi/rideshare, or public-transit pricing provider, none of which is integrated. No price appears
+  anywhere in this output.
+- **Rental-car/taxi/transit availability** - same provider gap; never fabricated.
+
+Full suite: 278 passed (256 prior + 18 new unit tests in `tests/test_transport_recommendations.py` +
+5 new API tests in `tests/test_api.py`).

@@ -1026,3 +1026,53 @@ def test_select_flight_still_leaves_plan_untouched_with_recommendations_present(
     assert body["selected_flight_index"] == 1
     assert body["plan"] == plan
     assert body["flight_recommendations"] is not None
+
+
+def test_get_trip_has_no_transport_recommendations_without_any_plan():
+    trip_id = _create_test_trip()
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["transport_recommendations"] is None
+
+
+def test_get_trip_has_no_transport_recommendations_when_plan_has_no_routed_data():
+    plan = {"flights": [{"price_raw": 100, "currency": "USD", "duration_minutes": 120, "stops": 0, "source": "real"}]}
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["transport_recommendations"] is None
+
+
+def test_get_trip_computes_airport_transfer_recommendation_from_real_transportation():
+    plan = {
+        "transportation": {
+            "mode": "driving", "from": "Goa Airport", "to": "accommodation",
+            "distance_km": 30.0, "duration_h": 0.6, "source": "real",
+        },
+    }
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    rec = resp.json()["transport_recommendations"]
+    assert rec is not None
+    assert rec["airport_transfer"]["recommended_mode"] == "dedicated_transfer"
+    assert rec["local_transport"] == []
+    assert rec["intercity_transport"] is None
+
+
+def test_get_trip_computes_local_transport_recommendations_from_itinerary_hops():
+    plan = {
+        "itinerary": {
+            "itinerary": [{
+                "day": 1,
+                "activities": [
+                    {"name": "Beach", "travel_after": {"distance_km": 2.0, "duration_h": 0.1}},
+                    {"name": "Museum"},
+                ],
+            }],
+        },
+    }
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    rec = resp.json()["transport_recommendations"]
+    assert rec is not None
+    assert rec["airport_transfer"] is None
+    assert len(rec["local_transport"]) == 1
+    assert rec["local_transport"][0]["recommended_mode"] == "cycle"

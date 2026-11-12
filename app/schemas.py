@@ -75,6 +75,7 @@ class TripDetail(TripSummary):
     # app/services/budget_allocator.py). None when there's nothing to compute from.
     budget_allocation: Optional[Dict[str, Any]] = None
     flight_recommendations: Optional[Dict[str, Any]] = None
+    transport_recommendations: Optional[Dict[str, Any]] = None
 
 
 class SelectIndexRequest(BaseModel):
