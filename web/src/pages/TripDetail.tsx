@@ -37,7 +37,10 @@ export default function TripDetail() {
         ← Back to Trips
       </Link>
 
-      <div className="mt-2 mb-6 flex items-center gap-3">
+      <div className="mt-2 mb-1 flex items-center gap-3">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50">
+          <img src="/icons/Travel/itinerary.svg" alt="" className="h-5 w-5" aria-hidden="true" />
+        </span>
         <h1 className="text-2xl font-bold">{trip.destination}</h1>
         <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">{trip.status}</span>
         {trip.model && (
@@ -50,7 +53,7 @@ export default function TripDetail() {
         )}
       </div>
 
-      <p className="mb-6 text-sm text-ink-500">
+      <p className="mb-6 ml-12 text-sm text-ink-500">
         {trip.days} day{trip.days === 1 ? "" : "s"} · {trip.trip_type} · {trip.budget}
         {trip.dietary_preferences.length > 0 && <> · {trip.dietary_preferences.join(", ")}</>}
       </p>
