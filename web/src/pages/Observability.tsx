@@ -9,12 +9,23 @@ function StatusDot({ status }: { status: string }) {
   return <span className={`inline-block h-2 w-2 rounded-full ${color}`} />;
 }
 
+function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+      <p className="text-xs font-medium text-ink-500">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-ink-900">{value}</p>
+      {sub && <p className="mt-1 text-xs text-ink-500">{sub}</p>}
+    </div>
+  );
+}
+
 export default function Observability() {
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TripDetail | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [allDetails, setAllDetails] = useState<TripDetail[]>([]);
 
   useEffect(() => {
     api
@@ -22,6 +33,10 @@ export default function Observability() {
       .then((t) => {
         setTrips(t);
         if (t.length > 0) setSelectedId(t[0].id);
+        // Real aggregate stats below are computed from these - not simulated.
+        Promise.all(t.map((trip) => api.getTrip(trip.id).catch(() => null))).then((details) =>
+          setAllDetails(details.filter((d): d is TripDetail => d !== null))
+        );
       })
       .catch((e) => setError(e.message));
   }, []);
@@ -38,15 +53,36 @@ export default function Observability() {
 
   const totalMs = detail?.trace.reduce((sum, t) => sum + t.duration_ms, 0) ?? 0;
 
+  const runsWithTrace = allDetails.filter((d) => d.trace.length > 0);
+  const totalRuns = runsWithTrace.length;
+  const allSteps = runsWithTrace.flatMap((d) => d.trace);
+  const successRate = allSteps.length ? (allSteps.filter((s) => s.status === "success").length / allSteps.length) * 100 : 0;
+  const avgLatencyMs = runsWithTrace.length
+    ? runsWithTrace.reduce((sum, d) => sum + d.trace.reduce((s, t) => s + t.duration_ms, 0), 0) / runsWithTrace.length
+    : 0;
+  const failedSteps = allSteps.filter((s) => s.status !== "success").length;
+
   return (
     <div>
       <h1 className="mb-1 text-2xl font-bold">Observability</h1>
       <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Per-agent timing and status for each trip's planning run (Phase 8) — which step was slow, which step
-        failed, and how long the whole plan took, for either orchestration framework.
+        Per-agent timing and status for each trip's planning run — which step was slow, which step
+        failed, and how long the whole plan took, for either orchestration framework. These numbers
+        come straight from the trace stored on each trip; there's no separate tracing backend
+        (LangSmith/Langfuse etc. aren't wired up yet).
       </p>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
+
+      {trips && trips.length > 0 && (
+        <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatTile label="Total Runs" value={String(totalRuns)} />
+          <StatTile label="Success Rate" value={allSteps.length ? `${successRate.toFixed(1)}%` : "—"} />
+          <StatTile label="Avg. Duration" value={avgLatencyMs ? `${(avgLatencyMs / 1000).toFixed(1)}s` : "—"} />
+          <StatTile label="Failed Steps" value={String(failedSteps)} sub={failedSteps ? "across all runs" : undefined} />
+        </div>
+      )}
+
       {trips && trips.length === 0 && !error && (
         <p className="text-sm text-ink-500">
           No trips yet. <Link to="/plan" className="font-medium text-brand-600">Plan one</Link> to see its trace here.
