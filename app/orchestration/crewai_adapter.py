@@ -30,6 +30,7 @@ from agents.dining_agent import DiningAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.research_agent import ResearchAgent
 from rag import get_context_for_destination
+from services import flights_api
 from services.geocoding import geocode_attractions
 from utils.logger import logger
 
@@ -42,7 +43,9 @@ class _TripContext:
     budget: str
     dietary_preferences: List[str]
     start_date: Optional[str] = None
+    origin: Optional[str] = None
     attractions: List[Dict] = field(default_factory=list)
+    flights: List[Dict] = field(default_factory=list)
     accommodations: List[Dict] = field(default_factory=list)
     best_accommodation_location: Optional[Tuple[float, float]] = None
     restaurants: List[Dict] = field(default_factory=list)
@@ -82,6 +85,7 @@ class CrewAIOrchestrator:
         budget: str = "mid-range",
         dietary_preferences: Optional[List[str]] = None,
         start_date: Optional[str] = None,
+        origin: Optional[str] = None,
     ) -> Dict:
         ctx = _TripContext(
             destination=destination,
@@ -90,6 +94,7 @@ class CrewAIOrchestrator:
             budget=budget,
             dietary_preferences=dietary_preferences or [],
             start_date=start_date,
+            origin=origin,
         )
         try:
             ctx.knowledge_context = get_context_for_destination(destination)
@@ -117,6 +122,21 @@ class CrewAIOrchestrator:
                 ctx.errors.append(str(exc))
                 ctx.trace.append(_trace_entry("research", start, "error", str(exc)))
             return f"Found {len(ctx.attractions)} attractions"
+
+        @tool("search_flights", result_as_answer=True)
+        def search_flights() -> str:
+            """Search real flights for the trip, if an origin and date were given. Never fabricates flight data."""
+            start = time.monotonic()
+            if not ctx.origin or not ctx.start_date:
+                ctx.trace.append(_trace_entry("flights", start, "skipped"))
+                return "No origin/date given, skipping real flight search"
+            try:
+                ctx.flights = flights_api.search_flights_for_trip(ctx.origin, ctx.destination, ctx.start_date) or []
+                ctx.trace.append(_trace_entry("flights", start, "success"))
+            except Exception as exc:
+                ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("flights", start, "error", str(exc)))
+            return f"Found {len(ctx.flights)} real flight offers"
 
         @tool("find_accommodations", result_as_answer=True)
         def find_accommodations() -> str:
@@ -193,6 +213,15 @@ class CrewAIOrchestrator:
             allow_delegation=False,
             verbose=False,
         )
+        flights_crew_agent = Agent(
+            role="Flight Scout",
+            goal="Search real flight offers for the trip when an origin and date are given",
+            backstory="A travel agent who only quotes flights actually found in a live search, never invented ones.",
+            tools=[search_flights],
+            llm=llm,
+            allow_delegation=False,
+            verbose=False,
+        )
         accommodation_crew_agent = Agent(
             role="Accommodation Scout",
             goal="Find well-located lodging near the trip's attractions",
@@ -226,6 +255,12 @@ class CrewAIOrchestrator:
             expected_output="A short confirmation of how many attractions were found.",
             agent=research_crew_agent,
         )
+        flights_task = Task(
+            description="Call the search_flights tool to search real flights for the trip.",
+            expected_output="A short confirmation of how many flight offers were found.",
+            agent=flights_crew_agent,
+            context=[research_task],
+        )
         accommodation_task = Task(
             description="Call the find_accommodations tool to find lodging near the attractions just researched.",
             expected_output="A short confirmation of how many accommodations were found.",
@@ -246,8 +281,8 @@ class CrewAIOrchestrator:
         )
 
         crew = Crew(
-            agents=[research_crew_agent, accommodation_crew_agent, dining_crew_agent, itinerary_crew_agent],
-            tasks=[research_task, accommodation_task, dining_task, itinerary_task],
+            agents=[research_crew_agent, flights_crew_agent, accommodation_crew_agent, dining_crew_agent, itinerary_crew_agent],
+            tasks=[research_task, flights_task, accommodation_task, dining_task, itinerary_task],
             process=Process.sequential,
             verbose=False,
         )
@@ -275,6 +310,7 @@ class CrewAIOrchestrator:
                 "itinerary": ctx.itinerary,
                 "restaurants": ctx.restaurants,
                 "accommodations": ctx.accommodations,
+                "flights": ctx.flights,
             },
             "errors": ctx.errors,
             "trace": ctx.trace,

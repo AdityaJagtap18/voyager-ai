@@ -11,6 +11,7 @@ from agents.itinerary_agent import ItineraryAgent
 from agents.dining_agent import DiningAgent
 from agents.accommodation_agent import AccommodationAgent
 from rag import get_context_for_destination
+from services import flights_api
 from services.geocoding import geocode_attractions
 from utils.logger import logger
 
@@ -23,11 +24,13 @@ class TravelPlanState(TypedDict):
     budget: str
     dietary_preferences: List[str]
     start_date: Optional[str]
+    origin: Optional[str]
     knowledge_context: str
     attractions: List[Dict]
     itinerary: Dict
     restaurants: List[Dict]
     accommodations: List[Dict]
+    flights: List[Dict]
     best_accommodation_location: Optional[Tuple[float, float]]
     current_step: str
     errors: List[str]
@@ -67,13 +70,15 @@ class MultiAgentWorkflow:
         workflow = StateGraph(TravelPlanState)
         
         workflow.add_node("research", self._research_node)
+        workflow.add_node("flights", self._flights_node)
         workflow.add_node("accommodation", self._accommodation_node)
         workflow.add_node("dining", self._dining_node)
         workflow.add_node("itinerary", self._itinerary_node)
-        
+
         # Flow: Dining comes before Itinerary so meals can be integrated
         workflow.set_entry_point("research")
-        workflow.add_edge("research", "accommodation")
+        workflow.add_edge("research", "flights")
+        workflow.add_edge("flights", "accommodation")
         workflow.add_edge("accommodation", "dining")
         workflow.add_edge("dining", "itinerary")
         workflow.add_edge("itinerary", END)
@@ -103,6 +108,31 @@ class MultiAgentWorkflow:
             trace_entry = _trace_entry("research", start, "error", str(e))
             return {"attractions": [], "errors": state.get("errors", []) + [str(e)], "trace": state.get("trace", []) + [trace_entry]}
     
+    def _flights_node(self, state: TravelPlanState) -> Dict:
+        """Step 2/5: Real flight search (Phase 10 fusion) - grounded only, never fabricated.
+
+        Only runs a real lookup when both origin and start_date are present
+        and RAPIDAPI_KEY is configured; otherwise returns an empty list rather
+        than inventing flight data (per the platform's anti-fabrication rules).
+        """
+        logger.info("Step 2/5: Flights - real flight search")
+        start = time.monotonic()
+        origin = state.get("origin")
+        depart_date = state.get("start_date")
+        if not origin or not depart_date:
+            return {"flights": [], "trace": state.get("trace", []) + [_trace_entry("flights", start, "skipped")]}
+        try:
+            flights = flights_api.search_flights_for_trip(origin, state["destination"], depart_date) or []
+            logger.info(f"Flights complete: {len(flights)} real offers found")
+            return {"flights": flights, "trace": state.get("trace", []) + [_trace_entry("flights", start, "success")]}
+        except Exception as e:
+            logger.error(f"Flights search error: {str(e)}")
+            return {
+                "flights": [],
+                "errors": state.get("errors", []) + [str(e)],
+                "trace": state.get("trace", []) + [_trace_entry("flights", start, "error", str(e))],
+            }
+
     def _accommodation_node(self, state: TravelPlanState) -> Dict:
         """Step 2: Find accommodations near attractions"""
         logger.info("Step 2/4: Accommodation Agent - Finding hotels near attractions")
@@ -184,7 +214,7 @@ class MultiAgentWorkflow:
     
     def plan_trip(self, destination: str, days: int, trip_type: str,
                   budget: str = "mid-range", dietary_preferences: List[str] = None,
-                  start_date: Optional[str] = None) -> Dict:
+                  start_date: Optional[str] = None, origin: Optional[str] = None) -> Dict:
         """Execute the complete multi-agent workflow"""
         logger.info("=" * 60)
         logger.info("Starting Multi-Agent Travel Planning with Integrated Dining")
@@ -203,11 +233,13 @@ class MultiAgentWorkflow:
             "budget": budget,
             "dietary_preferences": dietary_preferences or [],
             "start_date": start_date,
+            "origin": origin,
             "knowledge_context": knowledge_context,
             "attractions": [],
             "itinerary": {},
             "restaurants": [],
             "accommodations": [],
+            "flights": [],
             "best_accommodation_location": None,
             "current_step": "initialized",
             "errors": [],
@@ -231,7 +263,8 @@ class MultiAgentWorkflow:
                     "attractions": final_state["attractions"],
                     "itinerary": final_state["itinerary"],
                     "restaurants": final_state["restaurants"],
-                    "accommodations": final_state["accommodations"]
+                    "accommodations": final_state["accommodations"],
+                    "flights": final_state["flights"]
                 },
                 "errors": final_state["errors"],
                 "trace": final_state["trace"]

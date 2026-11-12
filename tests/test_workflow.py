@@ -52,9 +52,10 @@ def test_plan_trip_trace_covers_all_four_steps_in_order():
         result = workflow.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 
     assert result["success"] is True
-    assert [t["step"] for t in result["trace"]] == ["research", "accommodation", "dining", "itinerary"]
-    assert all(t["status"] == "success" for t in result["trace"])
+    assert [t["step"] for t in result["trace"]] == ["research", "flights", "accommodation", "dining", "itinerary"]
     assert all(isinstance(t["duration_ms"], float) for t in result["trace"])
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "skipped"  # no origin given in this test
 
 
 def test_plan_trip_passes_start_date_through_to_accommodation_agent():
@@ -96,4 +97,48 @@ def test_plan_trip_trace_records_error_status_for_failing_step():
     assert dining_entry["status"] == "error"
     assert "provider down" in dining_entry["error"]
     # Downstream steps still ran (each node independently catches its own error).
-    assert [t["step"] for t in result["trace"]] == ["research", "accommodation", "dining", "itinerary"]
+    assert [t["step"] for t in result["trace"]] == ["research", "flights", "accommodation", "dining", "itinerary"]
+
+
+def test_plan_trip_skips_flight_search_without_origin():
+    workflow, _ = _build_workflow_with_mocked_agents()
+
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ):
+        result = workflow.plan_trip(destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10")
+
+    assert result["plan"]["flights"] == []
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "skipped"
+
+
+def test_plan_trip_searches_real_flights_when_origin_and_date_given():
+    workflow, _ = _build_workflow_with_mocked_agents()
+
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ), patch("workflow.flights_api.search_flights_for_trip", return_value=[{"price": "₹4,977", "source": "real"}]) as mock_search:
+        result = workflow.plan_trip(
+            destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10", origin="Mumbai"
+        )
+
+    mock_search.assert_called_once_with("Mumbai", "Goa, India", "2026-12-10")
+    assert result["plan"]["flights"] == [{"price": "₹4,977", "source": "real"}]
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "success"
+
+
+def test_plan_trip_flights_error_does_not_fabricate_data():
+    workflow, _ = _build_workflow_with_mocked_agents()
+
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ), patch("workflow.flights_api.search_flights_for_trip", side_effect=RuntimeError("provider down")):
+        result = workflow.plan_trip(
+            destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10", origin="Mumbai"
+        )
+
+    assert result["plan"]["flights"] == []
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "error"

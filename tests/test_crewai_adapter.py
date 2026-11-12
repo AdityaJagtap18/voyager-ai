@@ -87,8 +87,9 @@ def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
     assert result["plan"]["restaurants"] == [{"name": "Leopold Cafe"}]
     assert result["plan"]["itinerary"] == {"itinerary": [{"day": 1}]}
     assert result["errors"] == []
-    assert [t["step"] for t in result["trace"]] == ["research", "accommodation", "dining", "itinerary"]
-    assert all(t["status"] == "success" for t in result["trace"])
+    assert [t["step"] for t in result["trace"]] == ["research", "flights", "accommodation", "dining", "itinerary"]
+    # flights is "skipped" (success path) rather than "success" since no origin was given here.
+    assert result["plan"]["flights"] == []
 
 
 def test_plan_trip_passes_start_date_through_to_accommodation_agent():
@@ -126,6 +127,44 @@ def test_plan_trip_collects_errors_without_crashing():
     assert result["trace"][0]["step"] == "research"
     assert result["trace"][0]["status"] == "error"
     assert "provider down" in result["trace"][0]["error"]
+
+
+def test_plan_trip_searches_real_flights_when_origin_and_date_given():
+    orchestrator, _ = _build_orchestrator_with_mocked_agents()
+
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
+    ), patch(
+        "orchestration.crewai_adapter.flights_api.search_flights_for_trip",
+        return_value=[{"price": "₹4,977", "source": "real"}],
+    ) as mock_search:
+        result = orchestrator.plan_trip(
+            destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10", origin="Mumbai"
+        )
+
+    mock_search.assert_called_once_with("Mumbai", "Goa, India", "2026-12-10")
+    assert result["plan"]["flights"] == [{"price": "₹4,977", "source": "real"}]
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "success"
+
+
+def test_plan_trip_skips_flight_search_without_origin():
+    orchestrator, _ = _build_orchestrator_with_mocked_agents()
+
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
+    ):
+        result = orchestrator.plan_trip(destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10")
+
+    assert result["plan"]["flights"] == []
+    flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
+    assert flights_entry["status"] == "skipped"
 
 
 def test_plan_trip_reports_failure_if_crew_kickoff_raises():

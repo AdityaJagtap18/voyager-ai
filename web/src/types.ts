@@ -24,6 +24,23 @@ export interface TripSummary {
   status: TripStatus;
   created_at: string;
   start_date: string | null;
+  origin: string | null;
+}
+
+export interface FlightOffer {
+  price: string | null;
+  price_raw: number | null;
+  currency: string;
+  airline: string | null;
+  duration_minutes: number | null;
+  stops: number | null;
+  origin: string | null;
+  destination: string | null;
+  departure: string | null;
+  arrival: string | null;
+  source: "real";
+  origin_query?: string;
+  destination_query?: string;
 }
 
 export interface Attraction {
@@ -85,6 +102,7 @@ export interface TripPlan {
   itinerary: ItineraryResult;
   restaurants: Restaurant[];
   accommodations: Accommodation[];
+  flights?: FlightOffer[];
 }
 
 export interface TraceEntry {
@@ -114,6 +132,7 @@ export interface TripCreateRequest {
   model?: string;
   framework?: string;
   start_date?: string;
+  origin?: string;
 }
 
 export interface ModelInfo {

@@ -100,3 +100,87 @@ identical trace/result shape consumed by the same frontend. Real provider integr
 (geocoding/routing), `hotels_api.py` / `restaurants_api.py` (RapidAPI), flights/weather providers,
 RAG knowledge base, guardrails. No microservices/Redis/Kafka/Kubernetes were introduced or are
 needed for anything audited here.
+
+## Phase 10 — Real flight grounding (scoped first slice of the "CRITICAL PRODUCT EXPANSION" request)
+
+A new, much larger task arrived mid-project asking Voyager to become a complete travel
+planning/discovery/comparison/booking platform (flights, accommodation, transportation,
+activities, restaurants, unified trip proposal, 3-level booking, budget intelligence, My Trips
+command center). Attempting the whole thing in one pass would mean fabricating most of it — the
+task's own acceptance criteria explicitly forbid that ("Do not use mock data to claim live booking
+functionality"). This pass implements one real, honestly-scoped slice and documents the rest as
+named gaps rather than faking them.
+
+**What was built — real flight search grounding the itinerary:**
+
+- `Trip.origin` (nullable, free-text departure city/airport) added to `app/models_db.py`,
+  `TripCreateRequest`/`TripSummary` in `app/schemas.py`, and threaded through `create_trip` in
+  `app/api.py`. Since this project has no migration framework (SQLite via `Base.metadata.create_all`,
+  which only creates missing *tables*, never adds columns to an existing one), `app/db.py` gained a
+  small `_add_missing_sqlite_columns()` step that `ALTER TABLE`s in any model column absent from the
+  on-disk table — verified live: the pre-existing "Goa" trip survived the restart with `origin: null`
+  rather than the whole `trips` table being dropped/recreated.
+- `services/flights_api.py` gained `search_flights_for_trip(origin_query, destination_query,
+  depart_date)`: resolves both free-text places via the existing `autocomplete_place()`, then calls
+  the existing `search_one_way()`. Returns `None` (never a fabricated list) when the provider is
+  unconfigured, a place can't be resolved, no offers come back, or the provider errors — mirroring
+  `accommodation_agent.py`'s `_get_real_hotels()` fallback-to-None pattern. Each offer is tagged
+  `"source": "real"`.
+- Wired into both orchestrators as a new `flights` step with its own trace entry: a "research →
+  flights → accommodation → dining → itinerary" node in `app/workflow.py` (LangGraph), and a
+  `search_flights` CrewAI tool/agent/task in `app/orchestration/crewai_adapter.py`, inserted the same
+  way in both so the trace shape and step ordering stay identical across frameworks (same as every
+  other step in this pipeline). The step records `"skipped"` (not an error) when no `origin`/
+  `start_date` was given, so a trip created without them costs nothing extra and shows no false error.
+- Frontend: `PlanTrip.tsx` gained a "Departure from" field; `TripDetail.tsx` gained a Flights tab
+  showing each real offer (airline, price, stops, duration, departure/arrival) with a **Level-2
+  booking handoff** link, labeled "Search & book on Google Flights →", plus an explicit caption
+  ("Voyager can't link directly to this exact offer, and no booking is completed here"). This
+  honesty constraint exists because **neither `flights_api.py` nor `hotels_api.py` returns a
+  booking deep-link for a specific offer** — confirmed by reading both services fully — so any
+  "continue to book" link can only be a generic provider search URL, never a link to the exact
+  bookable instance. Claiming otherwise would violate the task's "do not pretend a booking has been
+  completed if only a provider link was opened" constraint.
+- Tests added: `tests/test_flights_api.py` (5 new cases for `search_flights_for_trip` — unconfigured,
+  unresolvable origin, no offers, success tagging, provider error), `tests/test_workflow.py` (3 new
+  cases for the `flights` node — skipped/success/error), `tests/test_crewai_adapter.py` (2 new cases
+  for the `search_flights` tool). Existing trace-order assertions in both orchestrator test files
+  updated to include the new `flights` step. Full suite: **196 passed**.
+- Live-verified against the real RapidAPI key (not mocked): restarted the dev backend (user
+  confirmed first, since a standing instruction says not to tear it down unspoken), confirmed the
+  pre-existing trip survived the schema migration, then created a trip with `origin: "Mumbai"` and
+  `start_date: "2026-12-10"` — got back 5 real Air India/Air India Express offers (BOM→GOI/GOX,
+  $48–$64, with real departure/arrival timestamps), trace `flights: success`. Re-checked the
+  pre-existing trip's Flights tab shows the honest "No real flight data for this trip... add a
+  departure city and start date" message instead of an empty table or fabricated content.
+
+**What was explicitly NOT built this pass, and why (per the task's own instruction to document
+limitations rather than fake them):**
+
+- **Transportation discovery** (airport transfers, rental cars, public transit, taxis, intercity) —
+  no provider integrated for any of these; would need a dedicated adapter and credentials this
+  project doesn't have.
+- **Activity/attraction ticketing** (tour/ticket prices, availability, booking) — attractions today
+  come only from the LLM-generated research step, not a real ticketing provider.
+- **Restaurant reservation booking** — `restaurants_api.py` (RapidAPI local-business-data) is
+  discovery-only; it has no reservation/booking endpoint.
+- **"Replace one selection without regenerating the whole trip"** — the pipeline is still a single
+  linear run per trip; there's no per-section state model yet that would let a user swap just the
+  hotel and recompute only the affected budget/itinerary sections. This is a real architecture
+  change (stateful section storage + partial re-run), not a quick addition.
+- **Level 3 direct booking** — no provider here offers partner/booking API access; everything
+  booking-related stays Level 1 (discovery) or Level 2 (honest handoff link), per the acceptance
+  criteria's own instruction to implement the adapter interface and document the limitation rather
+  than fabricate completed bookings.
+- **Full "My Trips command center"** (chronological timeline, readiness checklist, proactive
+  alerts, cross-trip travel-document view) — My Trips today is the trip list + existing per-trip
+  tabs (Itinerary/Flights/Restaurants/Accommodations/Bookings/Budget/Documents/Share); the
+  dashboard-style rollup across all of a user's trips hasn't been built.
+- **Budget intelligence labeling real vs. estimated costs together** — the Budget tab still tracks
+  only the user-set target vs. logged `Expense` rows; it doesn't yet pull in the real flight price
+  or LLM-estimated accommodation/dining costs into one rollup with clear real/estimated labels. The
+  Flights/Accommodations/Restaurants tabs individually label each item "Live listing"/"Live
+  pricing"/"AI suggestion" (pre-existing pattern), but a trip-level combined total isn't computed.
+
+These are the concrete remaining gaps against the expansion request; each needs its own scoped
+increment rather than being attempted (and faked) in this one.

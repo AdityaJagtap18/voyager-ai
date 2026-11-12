@@ -418,6 +418,31 @@ This confirmed the audit's finding: the app's underlying design tokens (`ink`/`b
 
 **Deferred** (not yet done): Trip Detail's non-itinerary visual richness from the reference (the "AI Insights" card, day-by-day map panel) beyond the header icon; a live run of the Evaluations suite (covered by unit tests instead, for cost/time reasons); formal accessibility audit (keyboard nav, ARIA, contrast) beyond what the responsive pass covered visually.
 
+### Phase 10 (first slice) — real flight grounding, scoped from the "CRITICAL PRODUCT EXPANSION" request
+
+A new task arrived asking Voyager to become a full travel planning/discovery/comparison/booking
+platform — flights, accommodation, transportation, activities, restaurants, a unified trip
+proposal, 3-level booking, budget intelligence, a My Trips command center. Attempting all of it at
+once would mean fabricating most of it, which the task's own acceptance criteria explicitly forbid.
+Full detail (what was built, what was verified live, and the named gaps) is in
+`docs/VOYAGER_IMPLEMENTATION_AUDIT.md`'s "Phase 10" section; summary:
+
+**Built**: `Trip.origin` (new nullable field, with a small SQLite `ALTER TABLE` migration step in
+`app/db.py` so the existing trip survived the schema change) + a real flight search
+(`flights_api.search_flights_for_trip`, resolves free-text origin/destination via the existing
+autocomplete and never fabricates data — returns `None` on any failure) wired into both
+orchestrators as a new traced `flights` step, plus a Flights tab on Trip Detail with an honest
+Level-2 "search & book on Google Flights" handoff link (a generic prefilled search, not a
+specific-offer deep link — neither `flights_api.py` nor `hotels_api.py` exposes one). 10 new tests;
+196 total pass. Live-verified against the real RapidAPI key: created a Mumbai→Goa trip and got back
+5 real Air India/Air India Express offers with real prices/times; the pre-existing trip correctly
+shows "no real flight data" instead of anything fabricated.
+
+**Explicitly not built this pass** (named gaps, not faked): transportation discovery, activity/tour
+ticketing, restaurant reservation booking, per-section selection-replacement without a full
+regenerate, Level 3 direct booking, the full My Trips command center (timeline/checklist/alerts),
+and a unified real-vs-estimated budget rollup. Each needs its own scoped increment.
+
 ## Next step
 
-Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. What's left of the original blueprint is Phases 10–12 (advanced AI, full travel companion, OSS release polish), explicitly multi-quarter in scope per Section 5. A real multi-user auth system (flagged as a gap in Section 2.2) is also now a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
+Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first slice (real flight grounding) is also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — transportation/activity/restaurant-booking provider integrations, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, the full My Trips command center, and unified budget intelligence — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.

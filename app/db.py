@@ -33,6 +33,27 @@ def get_db():
         db.close()
 
 
+def _add_missing_sqlite_columns():
+    """create_all() only creates missing tables, never adds columns to an
+    existing one - so a column added to a model after the dev DB file already
+    exists (e.g. Trip.origin, Phase 10) would otherwise silently never show up.
+    No migration framework is in use, so this does the one thing actually
+    needed: add any trips columns absent from the on-disk table. SQLite-only;
+    a real Postgres deployment would use proper migrations instead.
+    """
+    if not DATABASE_URL.startswith("sqlite"):
+        return
+    from app import models_db  # noqa: F401
+    with engine.connect() as conn:
+        existing = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(trips)").fetchall()}
+        for column in Base.metadata.tables["trips"].columns:
+            if column.name not in existing:
+                col_type = column.type.compile(engine.dialect)
+                conn.exec_driver_sql(f"ALTER TABLE trips ADD COLUMN {column.name} {col_type}")
+        conn.commit()
+
+
 def init_db():
     from app import models_db  # noqa: F401  (ensure models are registered)
     Base.metadata.create_all(bind=engine)
+    _add_missing_sqlite_columns()

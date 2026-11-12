@@ -302,6 +302,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
         framework=framework_id,
         status="planning",
         start_date=payload.start_date,
+        origin=payload.origin,
     )
     db.add(trip)
     db.commit()
@@ -316,6 +317,7 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
             budget=trip.budget,
             dietary_preferences=trip.dietary_preferences,
             start_date=trip.start_date,
+            origin=trip.origin,
         )
     except Exception as exc:  # workflow-level failure (e.g. provider outage)
         trip.status = "failed"

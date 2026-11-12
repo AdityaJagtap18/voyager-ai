@@ -25,6 +25,12 @@ class TripCreateRequest(BaseModel):
         description="Optional check-in date (YYYY-MM-DD). When set and RAPIDAPI_KEY is configured, the "
         "accommodation agent grounds its recommendations in real, live hotel data instead of LLM-generated ones.",
     )
+    origin: Optional[str] = Field(
+        None,
+        examples=["Mumbai"],
+        description="Optional departure city/airport. When set together with start_date and RAPIDAPI_KEY is "
+        "configured, the itinerary is grounded in a real flight search instead of having no flight data at all.",
+    )
 
 
 class TripSummary(BaseModel):
@@ -36,6 +42,7 @@ class TripSummary(BaseModel):
     status: str
     created_at: datetime
     start_date: Optional[str] = None
+    origin: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -9,6 +9,7 @@ const fieldClass =
 
 const pipelineSteps = [
   { label: "Research", sub: "Finds attractions near your destination", icon: "AI-Engineering/agent.svg" },
+  { label: "Flights", sub: "Searches real flights when you give an origin + date", icon: "Travel/flights.svg" },
   { label: "Accommodation", sub: "Ranks hotels by proximity to those attractions", icon: "Travel/hotels.svg" },
   { label: "Dining", sub: "Finds restaurants, honoring dietary preferences", icon: "Travel/restaurant.svg" },
   { label: "Itinerary", sub: "Builds the optimized day-by-day schedule", icon: "Travel/itinerary.svg" },
@@ -18,6 +19,7 @@ export default function PlanTrip() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [destination, setDestination] = useState(() => searchParams.get("destination") ?? "");
+  const [origin, setOrigin] = useState("");
   const [days, setDays] = useState(3);
   const [tripType, setTripType] = useState<string>(TRIP_TYPES[0]);
   const [budget, setBudget] = useState<string>("mid-range");
@@ -58,6 +60,7 @@ export default function PlanTrip() {
         model: model || undefined,
         framework: framework || undefined,
         start_date: startDate || undefined,
+        origin: origin || undefined,
       });
       navigate(`/trips/${trip.id}`);
     } catch (e) {
@@ -122,6 +125,19 @@ export default function PlanTrip() {
                 AI-generated ones)
               </span>
               <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={fieldClass} />
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm font-medium">
+              Departure from{" "}
+              <span className="font-normal text-ink-500">
+                (optional — with a start date, grounds the trip in a real flight search instead of no flight data)
+              </span>
+              <input
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                placeholder="e.g. Mumbai"
+                className={fieldClass}
+              />
             </label>
           </div>
 
@@ -199,6 +215,7 @@ export default function PlanTrip() {
               {days} day{days === 1 ? "" : "s"} · {tripType} · {budget}
             </p>
             {startDate && <p className="mt-1 text-xs text-ink-500">Starting {startDate}</p>}
+            {origin && <p className="mt-1 text-xs text-ink-500">Flying from {origin}</p>}
           </div>
 
           <div className="rounded-xl2 border border-ink-900/5 bg-white p-5">

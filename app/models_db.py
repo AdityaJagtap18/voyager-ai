@@ -33,6 +33,12 @@ class Trip(Base):
     # as before, just without real-data grounding (see accommodation_agent.py).
     start_date = Column(String(10), nullable=True)
 
+    # Phase 10 (real flight grounding): optional free-text departure city/
+    # airport. Only used to query real flight search (services/flights_api.py)
+    # for the itinerary - trips can still be planned without one, same as
+    # start_date for hotels, just without real flight data.
+    origin = Column(String(255), nullable=True)
+
     status = Column(String(20), nullable=False, default="planning")  # planning | complete | failed
     plan = Column(JSON, nullable=True)  # {attractions, itinerary, restaurants, accommodations}
     errors = Column(JSON, nullable=False, default=list)

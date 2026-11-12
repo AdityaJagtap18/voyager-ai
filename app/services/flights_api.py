@@ -11,6 +11,7 @@ directly and hit its anti-bot captcha on a live test call — avoided here in
 favor of this host's plain `/flights/*` paths, which didn't.
 """
 import os
+from typing import Optional
 import requests
 
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
@@ -104,3 +105,41 @@ def search_one_way(origin: str, destination: str, depart_date: str, currency: st
             }
         )
     return offers
+
+
+def search_flights_for_trip(origin_query: str, destination_query: str, depart_date: str, limit: int = 5) -> Optional[list]:
+    """Real flight search grounded in free-text origin/destination (Phase 10 fusion).
+
+    Resolves both place names via autocomplete_place() to the skyId codes
+    search_one_way() needs, then searches. Returns None (never a fabricated
+    list) when the provider is unconfigured, either place can't be resolved,
+    no offers come back, or the provider errors - callers must treat None as
+    "no real flight data available" rather than inventing prices/times to
+    fill the gap (per the platform's anti-fabrication requirements).
+    """
+    if not is_configured():
+        return None
+    try:
+        origin_matches = autocomplete_place(origin_query)
+        if not origin_matches:
+            return None
+        dest_matches = autocomplete_place(destination_query)
+        if not dest_matches:
+            return None
+
+        origin_sky_id = origin_matches[0]["sky_id"]
+        dest_sky_id = dest_matches[0]["sky_id"]
+        if not origin_sky_id or not dest_sky_id:
+            return None
+
+        offers = search_one_way(origin_sky_id, dest_sky_id, depart_date)
+        if not offers:
+            return None
+
+        for offer in offers:
+            offer["source"] = "real"
+            offer["origin_query"] = origin_matches[0]["title"]
+            offer["destination_query"] = dest_matches[0]["title"]
+        return offers[:limit]
+    except FlightsAPIError:
+        return None
