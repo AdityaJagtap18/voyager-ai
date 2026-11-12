@@ -143,6 +143,34 @@ def test_find_accommodations_falls_back_to_llm_when_destination_unresolvable(mon
     assert accommodations[0]["name"] == "Backup Hotel"
 
 
+def test_find_accommodations_sorts_without_crashing_when_multiple_have_no_distance(monkeypatch):
+    """Regression test: when 2+ accommodations fail to geocode/matrix (avg_distance_to_attractions
+    is explicitly set to None, not missing), sorting must not raise
+    "'<' not supported between instances of 'NoneType' and 'NoneType'".
+    """
+    agent = _agent_with_fake_llm()
+    patcher = _mock_llm_accommodations(
+        agent,
+        '[{"name": "Hotel A", "location": "Nowhere A"},'
+        ' {"name": "Hotel B", "location": "Nowhere B"}]',
+    )
+    # Neither accommodation geocodes, so both end up with avg_distance_to_attractions = None.
+    monkeypatch.setattr("agents.accommodation_agent.geocode", lambda *a, **k: [])
+
+    try:
+        accommodations = agent.find_accommodations(
+            "Goa, India",
+            "relaxation",
+            3,
+            attractions=[{"name": "Fort", "coordinates": {"lat": 15.5, "lng": 73.8}}],
+        )
+    finally:
+        patcher.stop()
+
+    assert len(accommodations) == 2
+    assert all(a["avg_distance_to_attractions"] is None for a in accommodations)
+
+
 def test_find_accommodations_falls_back_to_llm_on_provider_error(monkeypatch):
     agent = _agent_with_fake_llm()
     patcher = _mock_llm_accommodations(agent, '[{"name": "Backup Hotel", "location": "Center"}]')

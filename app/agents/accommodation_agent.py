@@ -71,9 +71,12 @@ class AccommodationAgent:
                 accommodations, attractions
             )
             
-            # Sort by proximity to attractions
+            # Sort by proximity to attractions. avg_distance_to_attractions is explicitly
+            # set to None (not left missing) when a distance couldn't be calculated, so
+            # `.get(key, default)` won't catch it - None must be mapped to +inf too, or
+            # sorting two such entries raises "'<' not supported between NoneType and NoneType".
             accommodations.sort(
-                key=lambda x: x.get('avg_distance_to_attractions', float('inf'))
+                key=lambda x: x.get('avg_distance_to_attractions') if x.get('avg_distance_to_attractions') is not None else float('inf')
             )
         
         return accommodations

@@ -20,7 +20,8 @@ langchain-litellm
 crewai
 
 # Phase 7: RAG knowledge base (app/rag) and MCP server (app/mcp_server.py)
-mcp
+# Pinned <2: mcp 2.x renamed mcp.server.fastmcp.FastMCP, breaking app/mcp_server.py's import.
+mcp<2
 
 # ==========================================
 # API Framework
