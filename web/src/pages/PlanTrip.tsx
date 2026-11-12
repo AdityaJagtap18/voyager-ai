@@ -11,6 +11,7 @@ const pipelineSteps = [
   { label: "Research", sub: "Finds attractions near your destination", icon: "AI-Engineering/agent.svg" },
   { label: "Flights", sub: "Searches real flights when you give an origin + date", icon: "Travel/flights.svg" },
   { label: "Accommodation", sub: "Ranks hotels by proximity to those attractions", icon: "Travel/hotels.svg" },
+  { label: "Transportation", sub: "Routes a real airport-to-hotel transfer time", icon: "Travel/map.svg" },
   { label: "Dining", sub: "Finds restaurants, honoring dietary preferences", icon: "Travel/restaurant.svg" },
   { label: "Itinerary", sub: "Builds the optimized day-by-day schedule", icon: "Travel/itinerary.svg" },
 ];

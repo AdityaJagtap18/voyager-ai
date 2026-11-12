@@ -443,6 +443,32 @@ ticketing, restaurant reservation booking, per-section selection-replacement wit
 regenerate, Level 3 direct booking, the full My Trips command center (timeline/checklist/alerts),
 and a unified real-vs-estimated budget rollup. Each needs its own scoped increment.
 
+### Phase 10 (second slice) — real transportation discovery
+
+Adds one more real capability from the expansion request instead of fabricating it:
+`TransportAgent.find_airport_transfer()` (`app/agents/transport_agent.py`) geocodes the
+destination's airport and routes it to the trip's chosen accommodation via the existing ORS
+Directions API (`driving-car`), returning a real distance/drive-time - deliberately never a price,
+since ORS doesn't expose fares and no rental-car/taxi/transit pricing provider exists. Returns
+`None` on any failure (unconfigured, no accommodation location yet, airport unresolvable, routing
+error) rather than inventing a route. Wired into both orchestrators as a new `transportation` step
+(after `accommodation`, before `dining`); added a Trip Detail "Transportation" tab with an honest
+empty state naming exactly what's missing. `ors_api.py` gained an `is_configured()` helper to match
+`flights_api.py`/`hotels_api.py`'s pattern. 10 new tests (`test_transport_agent.py` + orchestrator
+wiring cases); 206 total pass.
+
+**Live-verified** (second approved backend restart): created a real trip with the ORS key
+configured; the step ran successfully but returned `null` because this session had already burned
+through ORS's free daily Matrix/Directions quota from earlier live-verification work ("Quota
+exceeded" in the backend log) - which is itself a useful confirmation that the "never fabricate,
+return None on failure" path fires for a genuine provider failure, not just a mocked one. Trip
+Detail's Transportation tab correctly showed the honest empty state instead of an invented route.
+The success-path rendering is covered by the mocked unit test instead, since today's quota didn't
+allow demonstrating it live.
+
+**Still gaps** (unchanged): rental-car listings, taxi fares, public-transit schedules/fares,
+intercity transport - no provider integrated for any of them.
+
 ## Next step
 
-Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first slice (real flight grounding) is also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — transportation/activity/restaurant-booking provider integrations, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, the full My Trips command center, and unified budget intelligence — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
+Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first two slices (real flight grounding, real transportation discovery) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, the full My Trips command center, and unified budget intelligence — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.

@@ -7,7 +7,16 @@ import TripDocuments from "../components/TripDocuments";
 import TripShare from "../components/TripShare";
 import type { TripDetail as TripDetailType } from "../types";
 
-type Tab = "itinerary" | "flights" | "restaurants" | "accommodations" | "bookings" | "budget" | "documents" | "share";
+type Tab =
+  | "itinerary"
+  | "flights"
+  | "transportation"
+  | "restaurants"
+  | "accommodations"
+  | "bookings"
+  | "budget"
+  | "documents"
+  | "share";
 
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>();
@@ -79,7 +88,17 @@ export default function TripDetail() {
         <>
           <div className="mb-4 flex gap-2 overflow-x-auto border-b border-ink-900/10">
             {(trip.plan
-              ? (["itinerary", "flights", "restaurants", "accommodations", "bookings", "budget", "documents", "share"] as Tab[])
+              ? ([
+                  "itinerary",
+                  "flights",
+                  "transportation",
+                  "restaurants",
+                  "accommodations",
+                  "bookings",
+                  "budget",
+                  "documents",
+                  "share",
+                ] as Tab[])
               : (["bookings", "budget", "documents", "share"] as Tab[])
             ).map((t) => (
               <button
@@ -174,6 +193,39 @@ export default function TripDetail() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {tab === "transportation" && trip.plan && (
+            <div className="flex flex-col gap-3">
+              {!trip.plan.transportation && (
+                <p className="rounded-xl2 border border-ink-900/5 bg-white p-4 text-sm text-ink-500">
+                  No real transfer route for this trip. This only covers an airport-to-accommodation
+                  drive, and only once accommodation is chosen — it needs an accommodation with coordinates.
+                  Rental cars, taxi fares, and public transit aren't integrated (no provider), so nothing
+                  for those is shown here, real or estimated.
+                </p>
+              )}
+              {trip.plan.transportation && (
+                <div className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="font-semibold">
+                      {trip.plan.transportation.from} → {trip.plan.transportation.to}
+                    </p>
+                    <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                      Real route
+                    </span>
+                  </div>
+                  <p className="text-sm text-ink-700">
+                    {trip.plan.transportation.distance_km} km · {trip.plan.transportation.duration_h.toFixed(1)}h
+                    driving
+                  </p>
+                  <p className="mt-2 text-xs text-ink-400">
+                    A real routed distance/duration, not a fare — no rental-car, taxi, or public-transit
+                    pricing provider is integrated, so no price is shown or estimated.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

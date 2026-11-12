@@ -184,3 +184,48 @@ limitations rather than fake them):**
 
 These are the concrete remaining gaps against the expansion request; each needs its own scoped
 increment rather than being attempted (and faked) in this one.
+
+## Phase 10 (second slice) — real transportation discovery
+
+Follow-on to the flight-grounding slice above: adds one more honestly-scoped real capability from
+the expansion request's Transportation section, rather than fabricating rental-car listings, taxi
+fares, or public-transit schedules — none of which has an integrated provider.
+
+**What was built**: `app/agents/transport_agent.py`'s `TransportAgent.find_airport_transfer()`
+geocodes "`<destination> Airport`" via the existing ORS geocoding (`services/ors_api.py`, already
+used by the accommodation/itinerary agents) and routes it to the trip's chosen accommodation with
+ORS Directions (`driving-car` profile, also already used for the itinerary's travel-time
+calculations) — giving a **real routed distance and drive time**. It deliberately returns only
+those two numbers, never a price: ORS doesn't expose fares, and no rental-car/taxi/public-transit
+pricing API is integrated, so no price is shown or estimated for this step, per the anti-fabrication
+constraints. Returns `None` (not a fabricated route) when ORS is unconfigured, there's no
+accommodation location yet, the airport can't be geocoded, or the routing call errors.
+
+Wired into both orchestrators as a new `transportation` step (after `accommodation`, since it needs
+the chosen accommodation's coordinates; before `dining`): a `_transportation_node` in
+`app/workflow.py`, and a `find_airport_transfer` CrewAI tool/agent/task in
+`app/orchestration/crewai_adapter.py`. Added a `TripDetail.tsx` "Transportation" tab showing the
+real distance/drive-time when found, with an explicit "not a fare" caption, and an honest empty
+state naming exactly what isn't covered (rental cars, taxi fares, public transit - no provider).
+`ors_api.py` gained an `is_configured()` helper (mirroring `flights_api.py`/`hotels_api.py`) instead
+of relying on a bare `ORS_API_KEY` check at each call site.
+
+**Tests**: new `tests/test_transport_agent.py` (5 cases: unconfigured, no accommodation location,
+unresolvable airport, real route success, routing error) plus 2 cases each added to
+`tests/test_workflow.py`/`tests/test_crewai_adapter.py` for the new orchestrator step (skip/success/
+error), with both files' mocked-agent builders updated to also mock `TransportAgent`. 206 tests pass.
+
+**Live-verified** (user approved restarting the dev backend again): created a Mumbai→Goa trip with
+the real ORS key configured; the `transportation` trace step ran (`status: success`) but returned
+`null` because this session had already exhausted ORS's free daily Matrix/Directions quota
+("Quota exceeded", visible in the backend log) from the many live verifications run earlier in this
+project - confirming the "never fabricate, return None instead" path actually fires under a real
+provider failure, not just in a mocked test. The Trip Detail Transportation tab correctly rendered
+the honest "no real transfer route" empty state rather than inventing a distance. The success-path
+rendering (a real route found) is covered by `test_transport_agent.py`'s mocked test instead, since
+the quota didn't allow demonstrating it live today.
+
+**Still not built** (unchanged from the flights slice's gap list): rental-car listings, taxi fare
+estimates, public-transit schedules/fares, intercity transport options - all need a provider this
+project doesn't have access to; the adapter-interface pattern here (`TransportAgent`, returning
+`None` on any failure) is the template a future provider integration would slot into.

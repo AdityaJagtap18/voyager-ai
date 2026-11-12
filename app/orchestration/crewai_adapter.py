@@ -29,6 +29,7 @@ from agents.accommodation_agent import AccommodationAgent
 from agents.dining_agent import DiningAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.research_agent import ResearchAgent
+from agents.transport_agent import TransportAgent
 from rag import get_context_for_destination
 from services import flights_api
 from services.geocoding import geocode_attractions
@@ -48,6 +49,7 @@ class _TripContext:
     flights: List[Dict] = field(default_factory=list)
     accommodations: List[Dict] = field(default_factory=list)
     best_accommodation_location: Optional[Tuple[float, float]] = None
+    transportation: Optional[Dict] = None
     restaurants: List[Dict] = field(default_factory=list)
     itinerary: Dict = field(default_factory=dict)
     errors: List[str] = field(default_factory=list)
@@ -76,6 +78,7 @@ class CrewAIOrchestrator:
         self.accommodation_agent = AccommodationAgent(model=model)
         self.dining_agent = DiningAgent(model=model)
         self.itinerary_agent = ItineraryAgent(model=model)
+        self.transport_agent = TransportAgent()
 
     def plan_trip(
         self,
@@ -164,6 +167,23 @@ class CrewAIOrchestrator:
                 ctx.trace.append(_trace_entry("accommodation", start, "error", str(exc)))
             return f"Found {len(ctx.accommodations)} accommodations"
 
+        @tool("find_airport_transfer", result_as_answer=True)
+        def find_airport_transfer() -> str:
+            """Find a real airport-to-accommodation transfer route. Never invents a rental-car/taxi/transit listing or fare."""
+            start = time.monotonic()
+            if not ctx.best_accommodation_location:
+                ctx.trace.append(_trace_entry("transportation", start, "skipped"))
+                return "No accommodation location yet, skipping transfer routing"
+            try:
+                ctx.transportation = self.transport_agent.find_airport_transfer(
+                    ctx.destination, ctx.best_accommodation_location
+                )
+                ctx.trace.append(_trace_entry("transportation", start, "success"))
+            except Exception as exc:
+                ctx.errors.append(str(exc))
+                ctx.trace.append(_trace_entry("transportation", start, "error", str(exc)))
+            return "Found a real airport transfer route" if ctx.transportation else "No real transfer route found"
+
         @tool("find_restaurants", result_as_answer=True)
         def find_restaurants() -> str:
             """Find restaurants near the accommodation, honoring dietary preferences."""
@@ -231,6 +251,15 @@ class CrewAIOrchestrator:
             allow_delegation=False,
             verbose=False,
         )
+        transport_crew_agent = Agent(
+            role="Transfer Scout",
+            goal="Find a real airport-to-accommodation transfer route once accommodation is chosen",
+            backstory="A logistics coordinator who only reports routes actually measured, never a guessed fare.",
+            tools=[find_airport_transfer],
+            llm=llm,
+            allow_delegation=False,
+            verbose=False,
+        )
         dining_crew_agent = Agent(
             role="Dining Scout",
             goal="Find restaurants that fit the trip's dietary preferences",
@@ -267,6 +296,12 @@ class CrewAIOrchestrator:
             agent=accommodation_crew_agent,
             context=[research_task],
         )
+        transportation_task = Task(
+            description="Call the find_airport_transfer tool to find a real transfer route to the accommodation.",
+            expected_output="A short confirmation of whether a real transfer route was found.",
+            agent=transport_crew_agent,
+            context=[accommodation_task],
+        )
         dining_task = Task(
             description="Call the find_restaurants tool to find restaurants near the accommodation.",
             expected_output="A short confirmation of how many restaurants were found.",
@@ -281,8 +316,15 @@ class CrewAIOrchestrator:
         )
 
         crew = Crew(
-            agents=[research_crew_agent, flights_crew_agent, accommodation_crew_agent, dining_crew_agent, itinerary_crew_agent],
-            tasks=[research_task, flights_task, accommodation_task, dining_task, itinerary_task],
+            agents=[
+                research_crew_agent,
+                flights_crew_agent,
+                accommodation_crew_agent,
+                transport_crew_agent,
+                dining_crew_agent,
+                itinerary_crew_agent,
+            ],
+            tasks=[research_task, flights_task, accommodation_task, transportation_task, dining_task, itinerary_task],
             process=Process.sequential,
             verbose=False,
         )
@@ -311,6 +353,7 @@ class CrewAIOrchestrator:
                 "restaurants": ctx.restaurants,
                 "accommodations": ctx.accommodations,
                 "flights": ctx.flights,
+                "transportation": ctx.transportation,
             },
             "errors": ctx.errors,
             "trace": ctx.trace,

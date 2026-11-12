@@ -33,7 +33,7 @@ def _build_orchestrator_with_mocked_agents():
         "orchestration.crewai_adapter.AccommodationAgent"
     ) as MockAccommodation, patch("orchestration.crewai_adapter.DiningAgent") as MockDining, patch(
         "orchestration.crewai_adapter.ItineraryAgent"
-    ) as MockItinerary:
+    ) as MockItinerary, patch("orchestration.crewai_adapter.TransportAgent") as MockTransport:
         research_instance = MockResearch.return_value
         research_instance.find_attractions.return_value = [{"name": "Gateway of India"}]
 
@@ -52,12 +52,16 @@ def _build_orchestrator_with_mocked_agents():
         itinerary_instance = MockItinerary.return_value
         itinerary_instance.create_schedule.return_value = {"itinerary": [{"day": 1}]}
 
+        transport_instance = MockTransport.return_value
+        transport_instance.find_airport_transfer.return_value = None
+
         orchestrator = CrewAIOrchestrator(model="gpt-4o-mini")
         return orchestrator, {
             "research": research_instance,
             "accommodation": accommodation_instance,
             "dining": dining_instance,
             "itinerary": itinerary_instance,
+            "transport": transport_instance,
         }
 
 
@@ -87,7 +91,14 @@ def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
     assert result["plan"]["restaurants"] == [{"name": "Leopold Cafe"}]
     assert result["plan"]["itinerary"] == {"itinerary": [{"day": 1}]}
     assert result["errors"] == []
-    assert [t["step"] for t in result["trace"]] == ["research", "flights", "accommodation", "dining", "itinerary"]
+    assert [t["step"] for t in result["trace"]] == [
+        "research",
+        "flights",
+        "accommodation",
+        "transportation",
+        "dining",
+        "itinerary",
+    ]
     # flights is "skipped" (success path) rather than "success" since no origin was given here.
     assert result["plan"]["flights"] == []
 
@@ -165,6 +176,59 @@ def test_plan_trip_skips_flight_search_without_origin():
     assert result["plan"]["flights"] == []
     flights_entry = next(t for t in result["trace"] if t["step"] == "flights")
     assert flights_entry["status"] == "skipped"
+
+
+def test_plan_trip_finds_real_airport_transfer_when_accommodation_located():
+    orchestrator, mocks = _build_orchestrator_with_mocked_agents()
+    mocks["transport"].find_airport_transfer.return_value = {
+        "mode": "driving",
+        "from": "Goa, India Airport",
+        "to": "accommodation",
+        "distance_km": 4.2,
+        "duration_h": 0.15,
+        "geometry": [],
+        "source": "real",
+    }
+
+    with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+        "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
+    ):
+        result = orchestrator.plan_trip(destination="Goa, India", days=5, trip_type="relaxation")
+
+    mocks["transport"].find_airport_transfer.assert_called_once_with("Goa, India", (1.0, 2.0))
+    assert result["plan"]["transportation"]["distance_km"] == 4.2
+    transportation_entry = next(t for t in result["trace"] if t["step"] == "transportation")
+    assert transportation_entry["status"] == "success"
+
+
+def test_plan_trip_skips_transportation_without_accommodation_location():
+    with patch("orchestration.crewai_adapter.ResearchAgent") as MockResearch, patch(
+        "orchestration.crewai_adapter.AccommodationAgent"
+    ) as MockAccommodation, patch("orchestration.crewai_adapter.DiningAgent") as MockDining, patch(
+        "orchestration.crewai_adapter.ItineraryAgent"
+    ) as MockItinerary, patch("orchestration.crewai_adapter.TransportAgent") as MockTransport:
+        MockResearch.return_value.find_attractions.return_value = []
+        MockAccommodation.return_value.find_accommodations.return_value = []
+        MockDining.return_value.find_restaurants.return_value = []
+        MockItinerary.return_value.create_schedule.return_value = {}
+        orchestrator = CrewAIOrchestrator(model="gpt-4o-mini")
+
+        with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
+            "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+        ), patch(
+            "orchestration.crewai_adapter.geocode_attractions",
+            side_effect=lambda attractions, destination: attractions,
+        ):
+            result = orchestrator.plan_trip(destination="Goa, India", days=5, trip_type="relaxation")
+
+        MockTransport.return_value.find_airport_transfer.assert_not_called()
+
+    assert result["plan"]["transportation"] is None
+    transportation_entry = next(t for t in result["trace"] if t["step"] == "transportation")
+    assert transportation_entry["status"] == "skipped"
 
 
 def test_plan_trip_reports_failure_if_crew_kickoff_raises():

@@ -97,12 +97,23 @@ export interface ItineraryResult {
   packing_suggestions?: string[];
 }
 
+export interface TransportationRoute {
+  mode: "driving";
+  from: string;
+  to: string;
+  distance_km: number;
+  duration_h: number;
+  geometry: [number, number][];
+  source: "real";
+}
+
 export interface TripPlan {
   attractions: Attraction[];
   itinerary: ItineraryResult;
   restaurants: Restaurant[];
   accommodations: Accommodation[];
   flights?: FlightOffer[];
+  transportation?: TransportationRoute | null;
 }
 
 export interface TraceEntry {

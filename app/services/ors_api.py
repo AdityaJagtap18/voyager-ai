@@ -12,6 +12,9 @@ BASE_MATRIX     = "https://api.openrouteservice.org/v2/matrix"
 class ORSError(RuntimeError):
     pass
 
+def is_configured() -> bool:
+    return bool(ORS_API_KEY)
+
 def _headers():
     if not ORS_API_KEY:
         raise ORSError("ORS_API_KEY not set. In PowerShell: $env:ORS_API_KEY='YOUR_ORS_KEY'")

@@ -10,6 +10,7 @@ from agents.research_agent import ResearchAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.dining_agent import DiningAgent
 from agents.accommodation_agent import AccommodationAgent
+from agents.transport_agent import TransportAgent
 from rag import get_context_for_destination
 from services import flights_api
 from services.geocoding import geocode_attractions
@@ -31,6 +32,7 @@ class TravelPlanState(TypedDict):
     restaurants: List[Dict]
     accommodations: List[Dict]
     flights: List[Dict]
+    transportation: Optional[Dict]
     best_accommodation_location: Optional[Tuple[float, float]]
     current_step: str
     errors: List[str]
@@ -62,6 +64,7 @@ class MultiAgentWorkflow:
         self.itinerary_agent = ItineraryAgent(model=model)
         self.dining_agent = DiningAgent(model=model)
         self.accommodation_agent = AccommodationAgent(model=model)
+        self.transport_agent = TransportAgent()
         self.graph = self._build_graph()
         logger.info("Multi-Agent Workflow ready")
     
@@ -72,6 +75,7 @@ class MultiAgentWorkflow:
         workflow.add_node("research", self._research_node)
         workflow.add_node("flights", self._flights_node)
         workflow.add_node("accommodation", self._accommodation_node)
+        workflow.add_node("transportation", self._transportation_node)
         workflow.add_node("dining", self._dining_node)
         workflow.add_node("itinerary", self._itinerary_node)
 
@@ -79,7 +83,8 @@ class MultiAgentWorkflow:
         workflow.set_entry_point("research")
         workflow.add_edge("research", "flights")
         workflow.add_edge("flights", "accommodation")
-        workflow.add_edge("accommodation", "dining")
+        workflow.add_edge("accommodation", "transportation")
+        workflow.add_edge("transportation", "dining")
         workflow.add_edge("dining", "itinerary")
         workflow.add_edge("itinerary", END)
         
@@ -174,6 +179,36 @@ class MultiAgentWorkflow:
                 "trace": state.get("trace", []) + [_trace_entry("accommodation", start, "error", str(e))]
             }
     
+    def _transportation_node(self, state: TravelPlanState) -> Dict:
+        """Step 3/6: Real airport-to-accommodation transfer (Phase 10 transportation slice).
+
+        Only a routed distance/duration (via ORS directions), grounded in the
+        real best accommodation location - never a rental-car/taxi/public-transit
+        listing or fare, since no such provider is integrated. Skips (not an
+        error) when there's no accommodation location to route to yet.
+        """
+        logger.info("Step 3/6: Transportation - real airport transfer route")
+        start = time.monotonic()
+        location = state.get("best_accommodation_location")
+        if not location:
+            return {
+                "transportation": None,
+                "trace": state.get("trace", []) + [_trace_entry("transportation", start, "skipped")],
+            }
+        try:
+            transportation = self.transport_agent.find_airport_transfer(state["destination"], location)
+            return {
+                "transportation": transportation,
+                "trace": state.get("trace", []) + [_trace_entry("transportation", start, "success")],
+            }
+        except Exception as e:
+            logger.error(f"Transportation Agent error: {str(e)}")
+            return {
+                "transportation": None,
+                "errors": state.get("errors", []) + [str(e)],
+                "trace": state.get("trace", []) + [_trace_entry("transportation", start, "error", str(e))],
+            }
+
     def _dining_node(self, state: TravelPlanState) -> Dict:
         """Step 3: Find restaurants near accommodation and attractions"""
         logger.info("Step 3/4: Dining Agent - Finding restaurants")
@@ -240,6 +275,7 @@ class MultiAgentWorkflow:
             "restaurants": [],
             "accommodations": [],
             "flights": [],
+            "transportation": None,
             "best_accommodation_location": None,
             "current_step": "initialized",
             "errors": [],
@@ -264,7 +300,8 @@ class MultiAgentWorkflow:
                     "itinerary": final_state["itinerary"],
                     "restaurants": final_state["restaurants"],
                     "accommodations": final_state["accommodations"],
-                    "flights": final_state["flights"]
+                    "flights": final_state["flights"],
+                    "transportation": final_state["transportation"]
                 },
                 "errors": final_state["errors"],
                 "trace": final_state["trace"]
