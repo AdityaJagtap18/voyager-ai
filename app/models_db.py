@@ -182,6 +182,41 @@ class TripDocument(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+# Phase 12 (observability): one row per OpenTelemetry span Voyager's own code
+# creates (app/observability/__init__.py's DBSpanExporter writes these) -
+# this is what backs the Observability UI's trace explorer/detail view, so
+# that view reads real collected telemetry instead of re-deriving everything
+# from Trip.trace on every request. Independent of whether an external
+# backend (an OTLP collector, Phoenix) is also configured - this table is
+# always populated when OTEL_ENABLED=true, regardless of export destination.
+class Span(Base):
+    __tablename__ = "spans"
+
+    id = Column(String(32), primary_key=True, default=_new_id)
+    trace_id = Column(String(32), nullable=False, index=True)
+    span_id = Column(String(16), nullable=False, index=True)
+    parent_span_id = Column(String(16), nullable=True, index=True)
+
+    name = Column(String(255), nullable=False)
+    # trip_id is pulled out of span attributes into its own indexed column so
+    # the trace explorer can filter "spans for trip X" without a JSON scan -
+    # every other attribute stays in the JSON blob below.
+    trip_id = Column(String(32), nullable=True, index=True)
+
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    duration_ms = Column(Float, nullable=False)
+
+    status = Column(String(20), nullable=False, default="unset")  # unset | ok | error
+    status_message = Column(Text, nullable=True)
+
+    attributes = Column(JSON, nullable=False, default=dict)
+    resource = Column(JSON, nullable=False, default=dict)
+    events = Column(JSON, nullable=False, default=list)  # [{name, timestamp, attributes}]
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class Expense(Base):
     __tablename__ = "expenses"
 

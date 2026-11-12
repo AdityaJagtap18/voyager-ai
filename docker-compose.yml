@@ -36,6 +36,33 @@ services:
     networks:
       - voyager-network
 
+  # Phase 12 (observability): Arize Phoenix, as its own container - never
+  # pip-installed into the voyager-ai service's own Python environment (see
+  # requirements.txt's comment: Phoenix's dependency chain conflicts with
+  # crewai's openai<3 pin and app/mcp_server.py's mcp<2 pin). Voyager talks
+  # to this purely over OTLP/HTTP via PHOENIX_COLLECTOR_ENDPOINT - optional,
+  # the core app starts and runs fine with this service absent or down.
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: voyager-phoenix
+    ports:
+      - "6006:6006"  # Phoenix UI + OTLP/HTTP collector
+      - "4317:4317"  # OTLP/gRPC collector
+    volumes:
+      - phoenix-data:/mnt/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6006/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - voyager-network
+
+volumes:
+  phoenix-data:
+
 networks:
   voyager-network:
     driver: bridge

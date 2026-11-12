@@ -15,6 +15,8 @@ from rag import get_context_for_destination
 from services import flights_api
 from services.geocoding import geocode_attractions
 from utils.logger import logger
+from app.observability import get_tracer
+from opentelemetry.trace import Status, StatusCode
 
 
 class TravelPlanState(TypedDict):
@@ -68,16 +70,42 @@ class MultiAgentWorkflow:
         self.graph = self._build_graph()
         logger.info("Multi-Agent Workflow ready")
     
+    @staticmethod
+    def _traced(step_name: str, node_fn):
+        """Wraps a node method in an `agent.{step_name}` OTel span (Phase 12,
+        Part 3.1) without touching each node's own body/return paths. Node
+        methods never raise (every one catches internally and records a
+        {status, error} trace entry instead, by design - see _trace_entry) -
+        so the span's status is set from that trace entry rather than from
+        an exception, which is the only way to actually reflect "this step
+        failed" here."""
+        def wrapped(state: "TravelPlanState") -> Dict:
+            tracer = get_tracer()
+            with tracer.start_as_current_span(f"agent.{step_name}") as span:
+                span.set_attribute("voyager.destination", state.get("destination") or "")
+                result = node_fn(state)
+                entries = result.get("trace") or []
+                last = entries[-1] if entries else None
+                if last and last.get("step") == step_name:
+                    span.set_attribute("voyager.step_status", last.get("status", "unknown"))
+                    if last.get("status") == "error":
+                        span.set_status(Status(StatusCode.ERROR, last.get("error") or "step failed"))
+                    else:
+                        span.set_status(Status(StatusCode.OK))
+                return result
+
+        return wrapped
+
     def _build_graph(self) -> StateGraph:
         """Build workflow: Research -> Accommodation -> Dining -> Itinerary (integrates meals)"""
         workflow = StateGraph(TravelPlanState)
-        
-        workflow.add_node("research", self._research_node)
-        workflow.add_node("flights", self._flights_node)
-        workflow.add_node("accommodation", self._accommodation_node)
-        workflow.add_node("transportation", self._transportation_node)
-        workflow.add_node("dining", self._dining_node)
-        workflow.add_node("itinerary", self._itinerary_node)
+
+        workflow.add_node("research", self._traced("research", self._research_node))
+        workflow.add_node("flights", self._traced("flights", self._flights_node))
+        workflow.add_node("accommodation", self._traced("accommodation", self._accommodation_node))
+        workflow.add_node("transportation", self._traced("transportation", self._transportation_node))
+        workflow.add_node("dining", self._traced("dining", self._dining_node))
+        workflow.add_node("itinerary", self._traced("itinerary", self._itinerary_node))
 
         # Flow: Dining comes before Itinerary so meals can be integrated
         workflow.set_entry_point("research")

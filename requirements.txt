@@ -57,6 +57,32 @@ tenacity
 streamlit
 
 # ==========================================
+# Observability (Phase 12) — all optional at runtime (see app/config.py's
+# OTEL_ENABLED/LANGSMITH_TRACING/PHOENIX_ENABLED), but the packages below are
+# needed for any of them to do anything. opentelemetry-api/-sdk/-exporter-otlp
+# and langsmith were already present transitively (langchain/crewai pull them
+# in for their own use); pinned here explicitly now that Voyager's own code
+# imports them directly too.
+#
+# Deliberately NOT listed here: arize-phoenix. Installing it into this venv
+# drags in a `fastmcp`/`pydantic-ai` chain that forces mcp>=2 (breaking
+# app/mcp_server.py's mcp<2-pinned FastMCP import) and openai>=3 (breaking
+# crewai's openai<3 pin) — confirmed live: it broke pytest collection itself
+# via Phoenix's own auto-loaded pytest plugin. Phoenix runs as its own
+# separate local service instead (docker-compose.yml's `phoenix` service, or
+# `pip install arize-phoenix` in a *different* venv) — Voyager only ever
+# talks to it over plain OTLP/HTTP (PHOENIX_COLLECTOR_ENDPOINT), so no
+# Phoenix package needs to share this process's dependency graph at all.
+# ==========================================
+opentelemetry-api
+opentelemetry-sdk
+opentelemetry-exporter-otlp
+opentelemetry-instrumentation-fastapi
+opentelemetry-instrumentation-sqlalchemy
+opentelemetry-instrumentation-requests
+langsmith
+
+# ==========================================
 # Development & Testing
 # ==========================================
 pytest

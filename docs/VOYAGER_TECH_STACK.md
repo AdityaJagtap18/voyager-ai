@@ -132,17 +132,18 @@ show Anthropic/Gemini/Ollama rows with data — there is none, by the above.
 
 ## 10. Observability and monitoring
 
-**This is the crux of the audit.** Nothing below was true before this audit,
-and the request this document was written for asks to change all of it.
+**Updated after Phase 12** (see `docs/VOYAGER_IMPLEMENTATION_AUDIT.md`'s Phase
+12 entry for the full build log). The table below reflects the state after
+that phase, not the pre-Phase-12 state this audit originally documented.
 
 | Technology | Version (if present) | Status |
 |---|---|---|
-| OpenTelemetry SDK/API | `opentelemetry-api`/`-sdk` 1.45.2, OTLP exporters 1.45.2/0.66b2 | **Not Integrated** — present only as a transitive dependency (pulled in by `crewai`'s own internal telemetry, not by Voyager's code). Zero imports of `opentelemetry` anywhere under `app/` or `web/src/`. No collector configured, no spans created by Voyager code. |
-| LangSmith | `langsmith` 0.14.17 | **Not Integrated** — same situation: transitive dependency of `langchain`, not configured. No `LANGCHAIN_TRACING_V2`/`LANGSMITH_API_KEY` in `.env`. Zero direct imports or references in app code. |
-| Arize Phoenix | — | **Not Integrated** — not installed at all, in any form (not even transitively). |
+| OpenTelemetry SDK/API | `opentelemetry-api`/`-sdk` 1.45.2, OTLP exporters 1.45.2/0.66b2 | **Active**, gated behind `OTEL_ENABLED` (default `false`). `app/observability/` builds a `TracerProvider` with a custom `DBSpanExporter` persisting every span to a new `Span` table, plus FastAPI and `requests` auto-instrumentation (`opentelemetry-instrumentation-sqlalchemy` is installed but confirmed **inert** — its own version guard refuses SQLAlchemy 2.1.8). Custom spans cover trip generation, every LangGraph node and CrewAI tool closure, and every LLM call, with secret/PII redaction applied before persistence. Live-verified: a real trip produced a correctly-nested 27-span trace. |
+| LangSmith | `langsmith` 0.14.17 | **Active**, gated behind `LANGSMITH_TRACING` (default `false`). No application code — LangChain's own SDK reads `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`/`LANGSMITH_PROJECT` from the environment and traces every `ChatLiteLLM.invoke()` call automatically. Known limitation: does not cover CrewAI's own `crewai.LLM`-based tool-selection reasoning, only the shared underlying agent model calls. Live-verified against a real tracing-scoped API key with a real trip generation (no send-failure logged); user to confirm the trace is visible in the LangSmith UI. |
+| Arize Phoenix | — | **Configured, not live-verified** — architected as its own Docker service (`docker-compose.yml`'s `phoenix` service, official image) talking to Voyager purely over OTLP/HTTP (`PHOENIX_COLLECTOR_ENDPOINT`, gated behind `PHOENIX_ENABLED`), deliberately never pip-installed into this app's venv (confirmed live: its `fastmcp`/`pydantic-ai` dependency chain breaks `app/mcp_server.py`'s `mcp<2` pin and crewai's `openai<3` pin, down to breaking `pytest` collection itself). No container has actually been started against it yet. |
 | Prometheus | — | **Not Integrated** — not installed, no `/metrics` endpoint exists. |
 | Grafana | — | **Not Integrated** — no dashboard config of any kind exists in the repo. |
-| Voyager's own `Trip.trace` field | custom | **Active**, but shallow (see Part 5 above) — this is the *entire* real observability surface today: a flat per-trip list of step timings, rendered by `web/src/pages/Observability.tsx` (client-side aggregation across trips, via N+1 `getTrip` calls — no backend aggregation endpoint exists) and `web/src/pages/Workflows.tsx`. |
+| Voyager's own `Trip.trace` field | custom | **Active**, unchanged by Phase 12 — still a flat per-trip list of step timings, rendered by `web/src/pages/Observability.tsx`/`Workflows.tsx`. The new `Span` table is a separate, richer store; the Observability UI has not yet been rebuilt to read from it (Phase 4, not started). |
 | Logging | stdlib `logging` | Active | `app/utils/logger.py` — a single `StreamHandler` to stdout, plain text formatter, no structured/JSON logging, no correlation IDs, no shipping to any log backend. |
 
 ## 11. Evaluation and testing

@@ -801,3 +801,99 @@ provider" warning once both have been tried. 24 tests across `tests/test_flights
 ("Mumbai", "Goa", "2026-12-10")` returned 5 real offers straight away (Air India Express and IndiGo,
 $48-$76, correct airport codes/times) with no parsing changes needed - the field names assumed from
 the listing's third-party docs matched the real payload exactly.
+
+## Phase 12 — AI observability: OpenTelemetry + LangSmith (Phoenix architected, not yet live)
+
+Requested as a large, 16-part spec ("OpenTelemetry + LangSmith + Arize Phoenix + Technology Stack
+Documentation") with its own explicit phase-gating rules ("do not implement everything in an
+uncontrolled manner", "do not mark an integration complete until a real trace has been verified").
+Followed that gating literally rather than building all three backends in one uncontrolled pass:
+
+- **Phase 0 (audit only, no code)**: produced `docs/VOYAGER_TECH_STACK.md`, a from-scratch inventory
+  of every technology actually resolved in this checkout (not `requirements.txt`'s unpinned ranges),
+  confirming that before this phase, OpenTelemetry/LangSmith existed only as *transitive* dependencies
+  of `langchain`/`crewai` (zero direct imports anywhere), Arize Phoenix wasn't installed in any form,
+  and the only real "observability" was `Trip.trace` - a flat per-step list with no span hierarchy,
+  no cross-trip aggregation endpoint, and no persistence beyond one trip's row.
+- Asked the user which backends to actually commit to (new accounts, heavy dependencies, Docker
+  changes aren't free) rather than assuming; the user chose all three.
+
+**What was built (Phase 1 - OpenTelemetry, Active)**: a new `app/observability/` package.
+`configure_observability(app, engine)` (called once from `app/api.py` at module scope, gated behind
+`OTEL_ENABLED`, default `false` - the app runs identically with it unset) builds a `TracerProvider`
+with a custom `DBSpanExporter` that writes every finished span into a new `Span` table
+(`app/models_db.py`) - so Voyager has a real, durable trace store independent of whether any external
+backend is configured or reachable. Auto-instruments FastAPI (every HTTP request as a root span) and
+`requests` (every outbound call - flights/hotels/weather/geocoding providers - instrumented app-wide
+with zero per-service code changes); `opentelemetry-instrumentation-sqlalchemy` is installed but
+confirmed **inert** at startup (its own version guard: "only instruments sqlalchemy >= 1.0.0, <
+2.1.0", this app runs 2.1.8) - logged as a known, honest gap rather than silently claimed as working.
+Custom spans added additively (no existing business logic rewritten): a `traced_span()` context
+manager wraps `create_trip()`'s orchestrator call (`voyager.trip.generate`, carrying the trip's real
+ID); `workflow.py`'s `_build_graph()` wraps each LangGraph node's *already-defined* bound method at
+the `add_node()` call site; `crewai_adapter.py`'s 6 tool closures each wrap their existing
+try/except body with a span, mirroring their own already-recorded trace-entry status (these
+functions deliberately swallow exceptions by pre-existing design, so a span can't take its status
+from a propagated exception here - it mirrors the manual trace entry instead). Every LLM call (both
+orchestrators construct `ChatLiteLLM` through the same `app/llm_gateway.get_chat_model()`) gets a
+`langchain_core` callback handler attached there, once - never duplicated per agent file.
+`app/observability/redaction.py` scrubs credential-shaped keys (`api_key`, `authorization`,
+`password`, `token`, ...) and credential-shaped value substrings (`sk-...`, `lsv2_..._...`, `Bearer
+...`) from every span attribute/event before it's persisted, unconditionally.
+
+**Bug caught via a real trace, not eyeballing the code**: only the root `voyager.trip.generate` span
+had a `voyager.trip_id` attribute (it's the only place that knows the trip's DB id) - filtering `Span`
+by `trip_id` for a real trip initially returned 1 row instead of the full 27-span trace. Fixed with a
+trace-id-scoped backfill `UPDATE` in `DBSpanExporter._write()`: after each export batch, copy any
+known `trip_id` for a `trace_id` onto every other span sharing that `trace_id` still missing one (safe
+regardless of which order `BatchSpanProcessor` flushes a trace's spans across). Re-verified with a
+second real trip: all 27 spans correctly returned, correct parent-child hierarchy confirmed down to
+the auto-instrumented provider-call children (several correctly showing `status=error` for an
+already-known, unrelated ORS quota-exhaustion issue).
+
+**What was built (Phase 2 - LangSmith, Active)**: no application code at all - LangSmith's own SDK
+reads `LANGSMITH_TRACING`/`LANGSMITH_API_KEY`/`LANGSMITH_PROJECT` directly from the process
+environment (`app/config.py`'s `load_dotenv()` already runs before any LangChain import) and traces
+every `ChatLiteLLM.invoke()` call automatically. Documented, honest limitation: CrewAI's own
+tool-selection reasoning goes through `crewai.LLM`/litellm directly, not LangChain's `BaseChatModel`,
+so LangSmith's automatic tracing covers the agents' underlying model calls (shared identically by both
+orchestrators) but not CrewAI's own meta-reasoning layer - flagged rather than assumed away, per the
+spec's own warning not to assume LangGraph instrumentation covers CrewAI. First API key the user
+supplied returned `401 Unauthorized` (genuinely invalid/revoked); a second, fresh key returned `403
+Forbidden: "projects:read is not allowed for tracing keys"` on a direct read-endpoint test - correctly
+diagnosed as *not* a failure (the `lsv2_tr_` prefix denotes a tracing-only, write-only key by
+LangSmith's own design; a 403 on a read call is actually confirmation the key authenticates). Backend
+restarted with the fresh key, a real trip ("Prague, Czechia") generated to produce a real trace, log
+checked for any LangSmith-side send failure - none appeared (LangChain's background tracer logs on
+failure rather than failing the request).
+
+**Phase 3 (Arize Phoenix) - architected, not live-verified**: deliberately never `pip install
+arize-phoenix` into this app's own venv - confirmed live that doing so drags in a `fastmcp`/
+`pydantic-ai` chain forcing `mcp>=2` (breaking `app/mcp_server.py`'s `mcp<2`-pinned `FastMCP` import)
+and `openai>=3` (breaking CrewAI's `openai<3` pin), to the point of breaking `pytest` collection
+itself via Phoenix's own auto-loaded pytest plugin. Recovered by fully uninstalling
+`arize-phoenix`/its sub-packages and reinstalling the pinned `openai`/`aiosqlite` versions (full suite
+back to passing, 336 tests). Resolved architecturally instead: Phoenix runs as its own container
+(`docker-compose.yml`'s new `phoenix` service, official image, no shared Python dependency graph),
+and `configure_observability()` only ever talks to it over plain OTLP/HTTP (a second
+`BatchSpanProcessor` on the same `TracerProvider`, gated behind `PHOENIX_ENABLED`) - no Phoenix Python
+package is imported anywhere in Voyager's own code. Not yet started/verified against a running
+container.
+
+**Tests**: `tests/test_observability.py`, 12 new cases - span attributes/OK status, exception
+recording + re-raise + ERROR status, parent-child relationships and trace-id propagation through
+plain nested function calls (how `workflow.py`/`crewai_adapter.py` actually call these), token-usage
+attributes never written as `0` when a provider doesn't report them vs. real counts when it does,
+no-op behavior when tracing is disabled, both redaction cases, exporter-failure isolation (`export()`
+returns `FAILURE`, never raises), and `configure_observability()` being a true no-op when
+`OTEL_ENABLED` is false. Required discovering that OTel's API refuses more than one
+`trace.set_tracer_provider()` call per process ("Overriding of current TracerProvider is not
+allowed") - so the fixture monkeypatches `app.observability.get_tracer` itself per test instead of
+touching the global provider.
+
+**Not yet done**: Phase 3's live Phoenix verification; Phase 4 (rebuilding the Observability UI
+against the new `Span` table - trace explorer, trace detail, per-agent/model/framework comparisons);
+Phase 5 (evaluation-framework integration); updating `docs/VOYAGER_TECH_STACK.md`'s own Observability
+section (done alongside this entry); the stale `docker-compose.yml` `voyager-ai` service still builds
+`streamlit run streamlit_app.py`, not the real FastAPI+Vite app - known from the Phase 0 audit,
+explicitly out of scope for this phase (the user chose "all three backends," not the Docker fix).

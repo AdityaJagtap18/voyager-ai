@@ -28,7 +28,8 @@ _APP_DIR = os.path.dirname(os.path.abspath(__file__))
 if _APP_DIR not in sys.path:
     sys.path.insert(0, _APP_DIR)
 
-from app.db import get_db, init_db  # noqa: E402
+from app.db import engine, get_db, init_db  # noqa: E402
+from app.observability import configure_observability, traced_span  # noqa: E402
 from app.models_db import Booking as BookingModel  # noqa: E402
 from app.models_db import Expense as ExpenseModel  # noqa: E402
 from app.models_db import Trip  # noqa: E402
@@ -122,6 +123,8 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(title="Voyager AI API", version="0.2.0", lifespan=lifespan)
+
+configure_observability(app=app, engine=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -421,16 +424,25 @@ def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
     db.refresh(trip)
 
     try:
-        workflow = get_orchestrator(framework_id, model_id)
-        result = workflow.plan_trip(
-            destination=trip.destination,
-            days=trip.days,
-            trip_type=trip.trip_type,
-            budget=trip.budget,
-            dietary_preferences=trip.dietary_preferences,
-            start_date=trip.start_date,
-            origin=trip.origin,
-        )
+        with traced_span(
+            "voyager.trip.generate",
+            **{
+                "voyager.trip_id": trip.id,
+                "voyager.destination": trip.destination,
+                "voyager.framework": framework_id,
+                "llm.model": model_id,
+            },
+        ):
+            workflow = get_orchestrator(framework_id, model_id)
+            result = workflow.plan_trip(
+                destination=trip.destination,
+                days=trip.days,
+                trip_type=trip.trip_type,
+                budget=trip.budget,
+                dietary_preferences=trip.dietary_preferences,
+                start_date=trip.start_date,
+                origin=trip.origin,
+            )
     except Exception as exc:  # workflow-level failure (e.g. provider outage)
         trip.status = "failed"
         trip.errors = [str(exc)]

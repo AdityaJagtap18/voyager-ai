@@ -34,6 +34,20 @@ from rag import get_context_for_destination
 from services import flights_api
 from services.geocoding import geocode_attractions
 from utils.logger import logger
+from app.observability import get_tracer
+from opentelemetry.trace import Status, StatusCode
+
+
+def _span_status_from_trace(span, trace_entry: Dict) -> None:
+    """Mirrors app/workflow.py's _traced() status logic - these CrewAI tools
+    catch their own errors internally (so the crew keeps running), so the
+    span's status comes from the trace entry they recorded, not from an
+    exception (none propagates here by design)."""
+    span.set_attribute("voyager.step_status", trace_entry.get("status", "unknown"))
+    if trace_entry.get("status") == "error":
+        span.set_status(Status(StatusCode.ERROR, trace_entry.get("error") or "step failed"))
+    else:
+        span.set_status(Status(StatusCode.OK))
 
 
 @dataclass
@@ -108,118 +122,138 @@ class CrewAIOrchestrator:
         def research_attractions() -> str:
             """Find attractions for the trip's destination and trip type."""
             start = time.monotonic()
-            try:
-                ctx.attractions = self.research_agent.find_attractions(
-                    destination=ctx.destination,
-                    trip_type=ctx.trip_type,
-                    days=ctx.days,
-                    knowledge_context=ctx.knowledge_context,
-                )
-                # Geocode now (not just at the final itinerary step) so the
-                # Accommodation and Dining steps that follow can actually
-                # score proximity to attractions instead of silently
-                # skipping it.
-                ctx.attractions = geocode_attractions(ctx.attractions, ctx.destination)
-                ctx.trace.append(_trace_entry("research", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("research", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.research") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                try:
+                    ctx.attractions = self.research_agent.find_attractions(
+                        destination=ctx.destination,
+                        trip_type=ctx.trip_type,
+                        days=ctx.days,
+                        knowledge_context=ctx.knowledge_context,
+                    )
+                    # Geocode now (not just at the final itinerary step) so the
+                    # Accommodation and Dining steps that follow can actually
+                    # score proximity to attractions instead of silently
+                    # skipping it.
+                    ctx.attractions = geocode_attractions(ctx.attractions, ctx.destination)
+                    ctx.trace.append(_trace_entry("research", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("research", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return f"Found {len(ctx.attractions)} attractions"
 
         @tool("search_flights", result_as_answer=True)
         def search_flights() -> str:
             """Search real flights for the trip, if an origin and date were given. Never fabricates flight data."""
             start = time.monotonic()
-            if not ctx.origin or not ctx.start_date:
-                ctx.trace.append(_trace_entry("flights", start, "skipped"))
-                return "No origin/date given, skipping real flight search"
-            try:
-                ctx.flights = flights_api.search_flights_for_trip(ctx.origin, ctx.destination, ctx.start_date) or []
-                ctx.trace.append(_trace_entry("flights", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("flights", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.flights") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                if not ctx.origin or not ctx.start_date:
+                    ctx.trace.append(_trace_entry("flights", start, "skipped"))
+                    _span_status_from_trace(span, ctx.trace[-1])
+                    return "No origin/date given, skipping real flight search"
+                try:
+                    ctx.flights = flights_api.search_flights_for_trip(ctx.origin, ctx.destination, ctx.start_date) or []
+                    ctx.trace.append(_trace_entry("flights", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("flights", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return f"Found {len(ctx.flights)} real flight offers"
 
         @tool("find_accommodations", result_as_answer=True)
         def find_accommodations() -> str:
             """Find accommodations near the attractions already researched."""
             start = time.monotonic()
-            try:
-                ctx.accommodations = self.accommodation_agent.find_accommodations(
-                    destination=ctx.destination,
-                    trip_type=ctx.trip_type,
-                    days=ctx.days,
-                    budget=ctx.budget,
-                    attractions=ctx.attractions,
-                    start_date=ctx.start_date,
-                )
-                if ctx.accommodations:
-                    best = self.accommodation_agent.get_best_accommodation(ctx.accommodations)
-                    if best and best.get("coordinates"):
-                        ctx.best_accommodation_location = (
-                            best["coordinates"]["lat"],
-                            best["coordinates"]["lng"],
-                        )
-                ctx.trace.append(_trace_entry("accommodation", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("accommodation", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.accommodation") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                try:
+                    ctx.accommodations = self.accommodation_agent.find_accommodations(
+                        destination=ctx.destination,
+                        trip_type=ctx.trip_type,
+                        days=ctx.days,
+                        budget=ctx.budget,
+                        attractions=ctx.attractions,
+                        start_date=ctx.start_date,
+                    )
+                    if ctx.accommodations:
+                        best = self.accommodation_agent.get_best_accommodation(ctx.accommodations)
+                        if best and best.get("coordinates"):
+                            ctx.best_accommodation_location = (
+                                best["coordinates"]["lat"],
+                                best["coordinates"]["lng"],
+                            )
+                    ctx.trace.append(_trace_entry("accommodation", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("accommodation", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return f"Found {len(ctx.accommodations)} accommodations"
 
         @tool("find_airport_transfer", result_as_answer=True)
         def find_airport_transfer() -> str:
             """Find a real airport-to-accommodation transfer route. Never invents a rental-car/taxi/transit listing or fare."""
             start = time.monotonic()
-            if not ctx.best_accommodation_location:
-                ctx.trace.append(_trace_entry("transportation", start, "skipped"))
-                return "No accommodation location yet, skipping transfer routing"
-            try:
-                ctx.transportation = self.transport_agent.find_airport_transfer(
-                    ctx.destination, ctx.best_accommodation_location
-                )
-                ctx.trace.append(_trace_entry("transportation", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("transportation", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.transportation") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                if not ctx.best_accommodation_location:
+                    ctx.trace.append(_trace_entry("transportation", start, "skipped"))
+                    _span_status_from_trace(span, ctx.trace[-1])
+                    return "No accommodation location yet, skipping transfer routing"
+                try:
+                    ctx.transportation = self.transport_agent.find_airport_transfer(
+                        ctx.destination, ctx.best_accommodation_location
+                    )
+                    ctx.trace.append(_trace_entry("transportation", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("transportation", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return "Found a real airport transfer route" if ctx.transportation else "No real transfer route found"
 
         @tool("find_restaurants", result_as_answer=True)
         def find_restaurants() -> str:
             """Find restaurants near the accommodation, honoring dietary preferences."""
             start = time.monotonic()
-            try:
-                ctx.restaurants = self.dining_agent.find_restaurants(
-                    destination=ctx.destination,
-                    trip_type=ctx.trip_type,
-                    days=ctx.days,
-                    dietary_preferences=ctx.dietary_preferences,
-                    accommodation_location=ctx.best_accommodation_location,
-                    attractions=ctx.attractions,
-                )
-                ctx.trace.append(_trace_entry("dining", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("dining", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.dining") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                try:
+                    ctx.restaurants = self.dining_agent.find_restaurants(
+                        destination=ctx.destination,
+                        trip_type=ctx.trip_type,
+                        days=ctx.days,
+                        dietary_preferences=ctx.dietary_preferences,
+                        accommodation_location=ctx.best_accommodation_location,
+                        attractions=ctx.attractions,
+                    )
+                    ctx.trace.append(_trace_entry("dining", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("dining", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return f"Found {len(ctx.restaurants)} restaurants"
 
         @tool("build_itinerary", result_as_answer=True)
         def build_itinerary() -> str:
             """Build the day-by-day schedule with meals integrated (real geocoding + route optimization)."""
             start = time.monotonic()
-            try:
-                ctx.itinerary = self.itinerary_agent.create_schedule(
-                    attractions=ctx.attractions,
-                    days=ctx.days,
-                    trip_type=ctx.trip_type,
-                    destination=ctx.destination,
-                    restaurants=ctx.restaurants,
-                    accommodation_location=ctx.best_accommodation_location,
-                )
-                ctx.trace.append(_trace_entry("itinerary", start, "success"))
-            except Exception as exc:
-                ctx.errors.append(str(exc))
-                ctx.trace.append(_trace_entry("itinerary", start, "error", str(exc)))
+            with get_tracer().start_as_current_span("agent.itinerary") as span:
+                span.set_attribute("voyager.destination", ctx.destination)
+                try:
+                    ctx.itinerary = self.itinerary_agent.create_schedule(
+                        attractions=ctx.attractions,
+                        days=ctx.days,
+                        trip_type=ctx.trip_type,
+                        destination=ctx.destination,
+                        restaurants=ctx.restaurants,
+                        accommodation_location=ctx.best_accommodation_location,
+                    )
+                    ctx.trace.append(_trace_entry("itinerary", start, "success"))
+                except Exception as exc:
+                    ctx.errors.append(str(exc))
+                    ctx.trace.append(_trace_entry("itinerary", start, "error", str(exc)))
+                _span_status_from_trace(span, ctx.trace[-1])
             return "Itinerary built"
 
         llm = self.model or "gpt-4o-mini"

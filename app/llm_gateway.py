@@ -85,8 +85,20 @@ def get_chat_model(model_id: Optional[str] = None, temperature: Optional[float] 
     string's provider prefix.
     """
     resolved = resolve_model(model_id)
+    info = MODEL_REGISTRY.get(resolved)
+    callbacks = []
+    if Config.OTEL_ENABLED:
+        # Phase 12: one callback handler per chat model, not a process-wide
+        # singleton - run_id-keyed state (see OTelLLMCallbackHandler) still
+        # needs isolating per model instance so concurrent trips can't cross
+        # streams, and a chat model is cheap to construct either way.
+        from app.observability.langchain_callback import OTelLLMCallbackHandler
+
+        callbacks.append(OTelLLMCallbackHandler(provider=info.provider if info else None))
+
     return ChatLiteLLM(
         model=resolved,
         temperature=temperature if temperature is not None else Config.OPENAI_TEMPERATURE,
         max_retries=Config.MAX_RETRIES,
+        callbacks=callbacks or None,
     )
