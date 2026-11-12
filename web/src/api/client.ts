@@ -104,6 +104,10 @@ export const api = {
     request<TripDetail>("/api/trips", { method: "POST", body: JSON.stringify(payload) }),
   setTripBudget: (id: string, budget_amount: number) =>
     request<TripDetail>(`/api/trips/${id}`, { method: "PATCH", body: JSON.stringify({ budget_amount }) }),
+  selectFlight: (id: string, index: number) =>
+    request<TripDetail>(`/api/trips/${id}/select-flight`, { method: "PATCH", body: JSON.stringify({ index }) }),
+  selectAccommodation: (id: string, index: number) =>
+    request<TripDetail>(`/api/trips/${id}/select-accommodation`, { method: "PATCH", body: JSON.stringify({ index }) }),
 
   listBookings: (tripId: string) => request<Booking[]>(`/api/trips/${tripId}/bookings`),
   createBooking: (tripId: string, payload: BookingCreateRequest) =>

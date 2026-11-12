@@ -507,6 +507,22 @@ timeline. `tsc --noEmit` clean; no backend changes, so all 206 tests still pass 
 **Not built**: a cross-trip map/calendar view, push notifications (these alerts render in-app, they
 aren't delivered) - reasonable follow-ons, but not what was explicitly asked for here.
 
+### Phase 10 (fifth slice) — per-section selection without full regeneration
+
+Adds `Trip.selected_accommodation_index`/`selected_flight_index` plus two endpoints:
+`select-flight` (sets the index, touches nothing else - flights feed nothing downstream here) and
+`select-accommodation` (sets the index and re-runs *only* `ItineraryAgent.create_schedule()` with
+the new location, since the itinerary genuinely depends on it; research/dining/flights are never
+re-run). A failed recompute keeps the old itinerary rather than losing it. `TripDetail.tsx` got
+Select/Selected controls on the Flights and Accommodations tabs. 6 new tests (212 total pass);
+`tsc --noEmit` clean. Live-verified: selecting an accommodation left all 5 options and the rest of
+the plan untouched while adding a real `itinerary_recompute` trace entry, and selecting a flight in
+the browser persisted correctly across reload.
+
+**Not built**: a budget section that recalculates toward the *selected* option specifically (the
+budget rollup's live-quotes card still shows the cheapest found option, not necessarily the
+selected one) - a small, reasonable follow-on.
+
 ## Next step
 
-Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first four slices (real flight grounding, real transportation discovery, labeled budget rollup, My Trips command center) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, and the unified trip proposal's independent-selection/recalculation architecture plus Level 3 direct booking — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
+Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first five slices (real flight grounding, real transportation discovery, labeled budget rollup, My Trips command center, per-section selection) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, and Level 3 direct booking — remains open; each needs real provider/partner access this project doesn't have, so building them now would mean fabricating data, which this whole phase has deliberately avoided. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.

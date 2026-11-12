@@ -308,3 +308,51 @@ correctly sorted it first. `tsc --noEmit` clean; 206 backend tests still pass (n
 aggregated); push-style notifications (no infra for that - these are rendered, not delivered,
 alerts). These would be reasonable follow-ons but weren't asked for as explicitly as the checklist/
 alerts/timeline were.
+
+## Phase 10 (fifth slice) — per-section selection without full regeneration
+
+Fifth slice: "Allow replacing individual selections without regenerating entire trip (e.g.,
+changing hotel must not regenerate flight/itinerary). Recalculate only affected budget/itinerary
+sections on change." Read literally, the parenthetical and the following sentence seem to
+disagree (itinerary depends on accommodation location in this app's existing design, so it can't
+both "not regenerate" and "recalculate... on change") - treated the second sentence as the actual
+requirement: don't touch *unrelated* sections, but do recompute what genuinely depends on the
+changed selection.
+
+**What was built**: `Trip` gained two nullable index columns, `selected_accommodation_index` and
+`selected_flight_index` (positions into the plan's own `accommodations`/`flights` lists - these
+options have no separate id). Two new endpoints:
+
+- `PATCH /api/trips/{id}/select-flight {index}` - validates the index, sets it, and touches
+  nothing else. Flights don't feed into anything else in this pipeline today, so this is a clean
+  demonstration of "change one thing, regenerate nothing."
+- `PATCH /api/trips/{id}/select-accommodation {index}` - validates the index, then re-runs *only*
+  `ItineraryAgent.create_schedule()` with the newly selected accommodation's coordinates (research/
+  accommodation-search/dining/flights are never re-run), replaces `plan.itinerary` with the result,
+  and appends an `itinerary_recompute` trace entry. If the recompute itself fails (e.g. ORS down),
+  the selection still succeeds and the *old* itinerary is kept rather than lost - handled the same
+  "never silently lose real data" way the rest of this phase has.
+
+Frontend: `TripDetail.tsx`'s Flights and Accommodations tabs got a "Select"/"Selected" control per
+option, with a note on the Accommodations tab stating exactly what does and doesn't get
+recalculated. `types.ts`/`client.ts` extended for the new fields/endpoints.
+
+**Tests**: 6 new cases in `tests/test_api.py` - select-flight sets the index and changes nothing
+else (asserted via full plan-dict equality), out-of-range and no-options-yet rejections for both
+endpoints, select-accommodation's itinerary recompute (asserts the new accommodation's coordinates
+were passed to `create_schedule`, and that attractions/flights/accommodations in the plan are
+unchanged), and the recompute-failure path keeping the old itinerary. 212 tests pass; `tsc --noEmit`
+clean.
+
+**Live-verified** (backend restarted in the background, confirmed healthy before testing): selected
+accommodation index 1 on a real trip - response showed `selected_accommodation_index: 1`, all 5
+accommodations still present and unchanged, and a new `itinerary_recompute: success` trace entry.
+Selected a real flight offer in the browser - the UI correctly showed "Selected" on the chosen
+offer and "Select" on the rest, persisting after reload.
+
+**Not built**: recalculating a *budget* section on selection change - there's still no structured,
+parseable numeric budget rollup across plan sections (per the budget-rollup slice's own documented
+decision not to parse LLM-estimated price ranges), so there's no "affected budget section" to
+recompute yet beyond what the Budget tab's live-quotes card already shows dynamically from
+whichever flight/accommodation happens to be cheapest - it doesn't yet prefer the *selected* one.
+That's a reasonable, small follow-on once this is wanted.

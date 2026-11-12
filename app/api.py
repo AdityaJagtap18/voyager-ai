@@ -11,6 +11,7 @@ Run with:
 import os
 import secrets
 import sys
+import time
 from contextlib import asynccontextmanager
 from datetime import date
 from typing import Dict, List, Optional
@@ -86,6 +87,7 @@ from app.schemas import (  # noqa: E402
     PlaceResult,
     PublicTripView,
     RouteResponse,
+    SelectIndexRequest,
     ShareLinkResponse,
     TripBudgetUpdate,
     TripCreateRequest,
@@ -95,6 +97,7 @@ from app.schemas import (  # noqa: E402
     WeatherForecastResponse,
 )
 from app.workflow import MultiAgentWorkflow, create_workflow  # noqa: E402
+from agents.itinerary_agent import ItineraryAgent  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -351,6 +354,70 @@ def _get_trip_or_404(trip_id: str, db: Session) -> Trip:
 def update_trip_budget(trip_id: str, payload: TripBudgetUpdate, db: Session = Depends(get_db)):
     trip = _get_trip_or_404(trip_id, db)
     trip.budget_amount = payload.budget_amount
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+# --- Per-section selection (Phase 10) ---------------------------------------------
+# Lets a user pick one option from the plan's already-generated flights/accommodations
+# list without regenerating the whole trip. Selecting a flight touches nothing else -
+# flights don't feed into anything downstream today. Selecting an accommodation DOES
+# re-run (only) the itinerary step, since the schedule's travel-time optimization
+# depends on accommodation location - "recalculate only the affected section," not
+# "change nothing," which is what the request actually asks for. Research/dining/
+# flights are never re-run by either endpoint.
+
+def _recompute_trace_entry(step: str, start: float, status: str, error: Optional[str] = None) -> Dict:
+    entry = {"step": step, "duration_ms": round((time.monotonic() - start) * 1000, 1), "status": status}
+    if error:
+        entry["error"] = error
+    return entry
+
+
+@app.patch("/api/trips/{trip_id}/select-flight", response_model=TripDetail)
+def select_flight(trip_id: str, payload: SelectIndexRequest, db: Session = Depends(get_db)):
+    trip = _get_trip_or_404(trip_id, db)
+    flights = (trip.plan or {}).get("flights") or []
+    if payload.index >= len(flights):
+        raise HTTPException(status_code=422, detail=f"index must be between 0 and {len(flights) - 1}")
+
+    trip.selected_flight_index = payload.index
+    db.commit()
+    db.refresh(trip)
+    return trip
+
+
+@app.patch("/api/trips/{trip_id}/select-accommodation", response_model=TripDetail)
+def select_accommodation(trip_id: str, payload: SelectIndexRequest, db: Session = Depends(get_db)):
+    trip = _get_trip_or_404(trip_id, db)
+    accommodations = (trip.plan or {}).get("accommodations") or []
+    if payload.index >= len(accommodations):
+        raise HTTPException(status_code=422, detail=f"index must be between 0 and {len(accommodations) - 1}")
+
+    selected = accommodations[payload.index]
+    coords = selected.get("coordinates")
+    accommodation_location = (coords["lat"], coords["lng"]) if coords else None
+
+    start = time.monotonic()
+    try:
+        itinerary_agent = ItineraryAgent(model=trip.model)
+        itinerary = itinerary_agent.create_schedule(
+            attractions=(trip.plan or {}).get("attractions", []),
+            days=trip.days,
+            trip_type=trip.trip_type,
+            destination=trip.destination,
+            restaurants=(trip.plan or {}).get("restaurants", []),
+            accommodation_location=accommodation_location,
+        )
+        trip.plan = {**trip.plan, "itinerary": itinerary}
+        trip.trace = (trip.trace or []) + [_recompute_trace_entry("itinerary_recompute", start, "success")]
+    except Exception as e:
+        # The selection itself still succeeds even if the itinerary recompute
+        # fails - the old itinerary just stays in place rather than being lost.
+        trip.trace = (trip.trace or []) + [_recompute_trace_entry("itinerary_recompute", start, "error", str(e))]
+
+    trip.selected_accommodation_index = payload.index
     db.commit()
     db.refresh(trip)
     return trip

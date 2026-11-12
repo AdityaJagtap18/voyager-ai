@@ -25,8 +25,9 @@ export default function TripDetail() {
   const [trip, setTrip] = useState<TripDetailType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
+  const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
 
-  useEffect(() => {
+  function refresh() {
     if (!id) return;
     api
       .getTrip(id)
@@ -35,7 +36,31 @@ export default function TripDetail() {
         if (!t.plan && !requestedTab) setTab("bookings");
       })
       .catch((e) => setError(e.message));
-  }, [id, requestedTab]);
+  }
+
+  useEffect(refresh, [id, requestedTab]);
+
+  async function handleSelectFlight(index: number) {
+    if (!id) return;
+    setSelectingIndex(index);
+    try {
+      const updated = await api.selectFlight(id, index);
+      setTrip(updated);
+    } finally {
+      setSelectingIndex(null);
+    }
+  }
+
+  async function handleSelectAccommodation(index: number) {
+    if (!id) return;
+    setSelectingIndex(index);
+    try {
+      const updated = await api.selectAccommodation(id, index);
+      setTrip(updated);
+    } finally {
+      setSelectingIndex(null);
+    }
+  }
 
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
   if (!trip) return <p className="text-sm text-ink-500">Loading…</p>;
@@ -159,15 +184,34 @@ export default function TripDetail() {
                         `Flights from ${f.origin_query ?? trip.origin} to ${f.destination_query ?? trip.destination} on ${trip.start_date}`
                       )}`
                     : null;
+                const isSelected = trip.selected_flight_index === i;
                 return (
-                  <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+                  <div
+                    key={i}
+                    className={`rounded-xl2 border bg-white p-4 ${isSelected ? "border-brand-500 ring-1 ring-brand-500" : "border-ink-900/5"}`}
+                  >
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <p className="font-semibold">
                         {f.airline ?? "Unknown airline"} · {f.origin} → {f.destination}
                       </p>
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        Live offer
-                      </span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          Live offer
+                        </span>
+                        {isSelected ? (
+                          <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                            Selected
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleSelectFlight(i)}
+                            disabled={selectingIndex !== null}
+                            className="rounded-full border border-ink-900/10 px-2 py-0.5 text-xs font-medium hover:bg-brand-50 disabled:opacity-50"
+                          >
+                            {selectingIndex === i ? "Selecting…" : "Select"}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <p className="text-sm text-ink-700">
                       {f.price ?? "Price unavailable"} · {f.stops === 0 ? "Nonstop" : `${f.stops} stop(s)`}
@@ -254,26 +298,53 @@ export default function TripDetail() {
           )}
 
           {tab === "accommodations" && trip.plan && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {trip.plan.accommodations.map((a, i) => (
-                <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="font-semibold">{a.name}</p>
-                    {a.source === "real" ? (
-                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                        Live pricing
-                      </span>
-                    ) : (
-                      <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
-                        AI suggestion
-                      </span>
-                    )}
-                  </div>
-                  <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
-                    {JSON.stringify(a, null, 2)}
-                  </pre>
-                </div>
-              ))}
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-ink-500">
+                Selecting an accommodation recomputes only the Itinerary tab's day-by-day schedule
+                (it depends on where you're staying) — flights, research, and dining aren't touched.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {trip.plan.accommodations.map((a, i) => {
+                  const isSelected = trip.selected_accommodation_index === i;
+                  return (
+                    <div
+                      key={i}
+                      className={`rounded-xl2 border bg-white p-4 ${isSelected ? "border-brand-500 ring-1 ring-brand-500" : "border-ink-900/5"}`}
+                    >
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="font-semibold">{String(a.name)}</p>
+                        <div className="flex shrink-0 items-center gap-2">
+                          {a.source === "real" ? (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              Live pricing
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
+                              AI suggestion
+                            </span>
+                          )}
+                          {isSelected ? (
+                            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                              Selected
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => handleSelectAccommodation(i)}
+                              disabled={selectingIndex !== null}
+                              className="rounded-full border border-ink-900/10 px-2 py-0.5 text-xs font-medium hover:bg-brand-50 disabled:opacity-50"
+                            >
+                              {selectingIndex === i ? "Recalculating…" : "Select"}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
+                        {JSON.stringify(a, null, 2)}
+                      </pre>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </>

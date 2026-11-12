@@ -169,10 +169,12 @@ def test_get_unknown_trip_returns_404():
     assert resp.status_code == 404
 
 
-def _create_test_trip() -> str:
-    """Insert a trip directly (bypassing the workflow) for bookings/expenses tests."""
+def _create_test_trip(plan=None) -> str:
+    """Insert a trip directly (bypassing the workflow) for bookings/expenses/selection tests."""
     db = TestingSessionLocal()
-    trip = api_module.Trip(destination="Goa, India", days=3, trip_type="foodie", budget="mid-range", status="complete")
+    trip = api_module.Trip(
+        destination="Goa, India", days=3, trip_type="foodie", budget="mid-range", status="complete", plan=plan
+    )
     db.add(trip)
     db.commit()
     db.refresh(trip)
@@ -186,6 +188,100 @@ def test_set_trip_budget():
     resp = client.patch(f"/api/trips/{trip_id}", json={"budget_amount": 50000})
     assert resp.status_code == 200
     assert resp.json()["budget_amount"] == 50000
+
+
+def test_select_flight_sets_index_without_touching_anything_else():
+    plan = {
+        "attractions": [{"name": "Fort"}],
+        "itinerary": {"itinerary": [{"day": 1}]},
+        "restaurants": [{"name": "Cafe"}],
+        "accommodations": [{"name": "Hotel A"}],
+        "flights": [{"price": "$50", "source": "real"}, {"price": "$60", "source": "real"}],
+    }
+    trip_id = _create_test_trip(plan=plan)
+
+    resp = client.patch(f"/api/trips/{trip_id}/select-flight", json={"index": 1})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["selected_flight_index"] == 1
+    # Nothing else in the plan changed.
+    assert body["plan"] == plan
+
+
+def test_select_flight_rejects_out_of_range_index():
+    trip_id = _create_test_trip(plan={"flights": [{"price": "$50"}]})
+    resp = client.patch(f"/api/trips/{trip_id}/select-flight", json={"index": 5})
+    assert resp.status_code == 422
+
+
+def test_select_flight_rejects_when_no_flights_in_plan():
+    trip_id = _create_test_trip(plan={"attractions": []})
+    resp = client.patch(f"/api/trips/{trip_id}/select-flight", json={"index": 0})
+    assert resp.status_code == 422
+
+
+def test_select_accommodation_recomputes_only_itinerary(monkeypatch):
+    plan = {
+        "attractions": [{"name": "Fort", "coordinates": {"lat": 1.0, "lng": 2.0}}],
+        "itinerary": {"itinerary": [{"day": 1, "theme": "old"}]},
+        "restaurants": [{"name": "Cafe"}],
+        "accommodations": [
+            {"name": "Hotel A", "coordinates": {"lat": 1.0, "lng": 2.0}},
+            {"name": "Hotel B", "coordinates": {"lat": 3.0, "lng": 4.0}},
+        ],
+        "flights": [{"price": "$50"}],
+    }
+    trip_id = _create_test_trip(plan=plan)
+
+    fake_itinerary_agent = MagicMock()
+    fake_itinerary_agent.create_schedule.return_value = {"itinerary": [{"day": 1, "theme": "new"}]}
+    monkeypatch.setattr(api_module, "ItineraryAgent", lambda model=None: fake_itinerary_agent)
+
+    resp = client.patch(f"/api/trips/{trip_id}/select-accommodation", json={"index": 1})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["selected_accommodation_index"] == 1
+    assert body["plan"]["itinerary"] == {"itinerary": [{"day": 1, "theme": "new"}]}
+    # Everything else in the plan is untouched.
+    assert body["plan"]["attractions"] == plan["attractions"]
+    assert body["plan"]["flights"] == plan["flights"]
+    assert body["plan"]["accommodations"] == plan["accommodations"]
+
+    _, kwargs = fake_itinerary_agent.create_schedule.call_args
+    assert kwargs["accommodation_location"] == (3.0, 4.0)
+
+    trace_entry = next(t for t in body["trace"] if t["step"] == "itinerary_recompute")
+    assert trace_entry["status"] == "success"
+
+
+def test_select_accommodation_keeps_old_itinerary_if_recompute_fails(monkeypatch):
+    plan = {
+        "attractions": [],
+        "itinerary": {"itinerary": [{"day": 1, "theme": "old"}]},
+        "restaurants": [],
+        "accommodations": [{"name": "Hotel A", "coordinates": {"lat": 1.0, "lng": 2.0}}],
+        "flights": [],
+    }
+    trip_id = _create_test_trip(plan=plan)
+
+    fake_itinerary_agent = MagicMock()
+    fake_itinerary_agent.create_schedule.side_effect = RuntimeError("ORS down")
+    monkeypatch.setattr(api_module, "ItineraryAgent", lambda model=None: fake_itinerary_agent)
+
+    resp = client.patch(f"/api/trips/{trip_id}/select-accommodation", json={"index": 0})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["selected_accommodation_index"] == 0
+    assert body["plan"]["itinerary"] == {"itinerary": [{"day": 1, "theme": "old"}]}
+    trace_entry = next(t for t in body["trace"] if t["step"] == "itinerary_recompute")
+    assert trace_entry["status"] == "error"
+    assert "ORS down" in trace_entry["error"]
+
+
+def test_select_accommodation_rejects_out_of_range_index():
+    trip_id = _create_test_trip(plan={"accommodations": [{"name": "Hotel A"}]})
+    resp = client.patch(f"/api/trips/{trip_id}/select-accommodation", json={"index": 3})
+    assert resp.status_code == 422
 
 
 def test_booking_crud_lifecycle():

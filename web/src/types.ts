@@ -25,6 +25,8 @@ export interface TripSummary {
   created_at: string;
   start_date: string | null;
   origin: string | null;
+  selected_accommodation_index: number | null;
+  selected_flight_index: number | null;
 }
 
 export interface FlightOffer {

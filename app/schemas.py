@@ -43,6 +43,8 @@ class TripSummary(BaseModel):
     created_at: datetime
     start_date: Optional[str] = None
     origin: Optional[str] = None
+    selected_accommodation_index: Optional[int] = None
+    selected_flight_index: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -56,6 +58,12 @@ class TripDetail(TripSummary):
     framework: Optional[str] = None
     trace: List[Dict[str, Any]] = Field(default_factory=list)
     share_token: Optional[str] = None
+
+
+class SelectIndexRequest(BaseModel):
+    """Picks one option from the trip's already-generated plan.accommodations/plan.flights
+    list by index - there's no separate id for these options, just their position."""
+    index: int = Field(..., ge=0)
 
 
 class ModelInfoResponse(BaseModel):

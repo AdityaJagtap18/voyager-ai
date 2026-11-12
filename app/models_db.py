@@ -39,6 +39,15 @@ class Trip(Base):
     # start_date for hotels, just without real flight data.
     origin = Column(String(255), nullable=True)
 
+    # Phase 10 (per-section selection): which plan.accommodations/plan.flights
+    # list index the user picked, if any. Selecting a flight touches nothing
+    # else; selecting an accommodation re-runs only the itinerary step (it
+    # depends on accommodation location) - see api.py's select-accommodation/
+    # select-flight endpoints. Index into the plan's own lists, not a
+    # separate id, since those options have no stable id of their own.
+    selected_accommodation_index = Column(Integer, nullable=True)
+    selected_flight_index = Column(Integer, nullable=True)
+
     status = Column(String(20), nullable=False, default="planning")  # planning | complete | failed
     plan = Column(JSON, nullable=True)  # {attractions, itinerary, restaurants, accommodations}
     errors = Column(JSON, nullable=False, default=list)
