@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import { BUDGET_LEVELS, TRIP_TYPES, type FrameworkInfo, type ModelInfo } from "../types";
 
 const fieldClass =
@@ -67,11 +68,11 @@ export default function PlanTrip() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Plan a Trip</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Tell Voyager where you&apos;re headed — the multi-agent workflow researches attractions,
-        hotels, restaurants, and builds an optimized day-by-day itinerary.
-      </p>
+      <PageHeader
+        icon="Navigation/plan-trip.svg"
+        title="Plan a Trip"
+        description="Tell Voyager where you're headed — the multi-agent workflow researches attractions, hotels, restaurants, and builds an optimized day-by-day itinerary."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-xl2 border border-ink-900/5 bg-white p-6">

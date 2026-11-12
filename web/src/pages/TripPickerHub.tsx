@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { TripSummary } from "../types";
 
 /**
@@ -9,7 +10,17 @@ import type { TripSummary } from "../types";
  * ledger). This hub lets the sidebar link go somewhere real: pick a trip,
  * land on that tab in Trip Detail — rather than a dead "coming soon" page.
  */
-export default function TripPickerHub({ title, description, tab }: { title: string; description: string; tab: "bookings" | "budget" }) {
+export default function TripPickerHub({
+  title,
+  description,
+  tab,
+  icon,
+}: {
+  title: string;
+  description: string;
+  tab: "bookings" | "budget";
+  icon: string;
+}) {
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -19,8 +30,7 @@ export default function TripPickerHub({ title, description, tab }: { title: stri
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">{title}</h1>
-      <p className="mb-6 text-sm text-ink-500">{description}</p>
+      <PageHeader icon={icon} title={title} description={description} />
 
       {loading && <p className="text-sm text-ink-500">Loading…</p>}
       {!loading && trips.length === 0 && (

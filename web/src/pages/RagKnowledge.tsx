@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { KnowledgeDocumentSummary, KnowledgeSearchResult } from "../types";
 
 export default function RagKnowledge() {
@@ -60,12 +61,11 @@ export default function RagKnowledge() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">RAG & Knowledge</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Add free-text notes or guides about a destination — visa rules, a local's tips, anything the agents
-        wouldn&apos;t already know. The Research Agent automatically grounds itself in whatever matches a trip&apos;s
-        destination (Phase 7); search below previews what it would retrieve.
-      </p>
+      <PageHeader
+        icon="AI-Engineering/rag.svg"
+        title="RAG & Knowledge"
+        description="Add free-text notes or guides about a destination — visa rules, a local's tips, anything the agents wouldn't already know. The Research Agent automatically grounds itself in whatever matches a trip's destination (Phase 7); search below previews what it would retrieve."
+      />
 
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
         <form onSubmit={handleAdd} className="flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">

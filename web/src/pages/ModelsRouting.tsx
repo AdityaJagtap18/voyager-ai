@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { ModelInfo } from "../types";
 
 export default function ModelsRouting() {
@@ -15,13 +16,18 @@ export default function ModelsRouting() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Models & Routing</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        The model gateway (Phase 5) routes every agent through one provider-agnostic{" "}
-        <code className="rounded bg-ink-900/5 px-1 py-0.5 text-xs">model</code> id, built on LiteLLM.
-        &quot;Configured&quot; means the server has the API key that model needs — not that a call has
-        actually been test-fired against the provider.
-      </p>
+      <PageHeader
+        icon="AI-Engineering/model.svg"
+        title="Models & Routing"
+        description={
+          <>
+            The model gateway (Phase 5) routes every agent through one provider-agnostic{" "}
+            <code className="rounded bg-ink-900/5 px-1 py-0.5 text-xs">model</code> id, built on LiteLLM.
+            &quot;Configured&quot; means the server has the API key that model needs — not that a call
+            has actually been test-fired against the provider.
+          </>
+        }
+      />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {!models && !error && <p className="text-sm text-ink-500">Loading…</p>}

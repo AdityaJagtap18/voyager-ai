@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { TripSummary, TripDetail } from "../types";
 
 function StatusDot({ status }: { status: string }) {
@@ -64,13 +65,11 @@ export default function Observability() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Observability</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Per-agent timing and status for each trip's planning run — which step was slow, which step
-        failed, and how long the whole plan took, for either orchestration framework. These numbers
-        come straight from the trace stored on each trip; there's no separate tracing backend
-        (LangSmith/Langfuse etc. aren't wired up yet).
-      </p>
+      <PageHeader
+        icon="AI-Engineering/observability.svg"
+        title="Observability"
+        description="Per-agent timing and status for each trip's planning run — which step was slow, which step failed, and how long the whole plan took, for either orchestration framework. These numbers come straight from the trace stored on each trip; there's no separate tracing backend (LangSmith/Langfuse etc. aren't wired up yet)."
+      />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
 

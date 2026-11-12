@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { WeatherForecast } from "../types";
 
 export default function Weather() {
@@ -23,11 +24,11 @@ export default function Weather() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Weather</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Real forecast data from OpenWeatherMap (Phase 3) — the free tier only looks 5 days ahead, so a trip
-        further out won't show a full-length forecast here.
-      </p>
+      <PageHeader
+        icon="Travel/weather.svg"
+        title="Weather"
+        description="Real forecast data from OpenWeatherMap (Phase 3) — the free tier only looks 5 days ahead, so a trip further out won't show a full-length forecast here."
+      />
 
       <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <label className="flex flex-1 min-w-[220px] flex-col gap-1 text-sm font-medium">

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { MapPlace, MapRoute } from "../types";
 
 function PlacePicker({
@@ -141,11 +142,11 @@ export default function Maps() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Maps</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Real routing (Phase 3), via OpenRouteService — driving distance/duration between two places, drawn on an
-        OpenStreetMap base map.
-      </p>
+      <PageHeader
+        icon="Travel/map.svg"
+        title="Maps"
+        description="Real routing (Phase 3), via OpenRouteService — driving distance/duration between two places, drawn on an OpenStreetMap base map."
+      />
 
       <form onSubmit={handleSearch} className="mb-6 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <PlacePicker label="From" placeholder="e.g. Mumbai" value={origin} onChange={setOrigin} />

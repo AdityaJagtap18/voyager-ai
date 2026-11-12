@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { AgentInfo, FrameworkInfo } from "../types";
 
 export default function AgentStudio() {
@@ -18,12 +19,11 @@ export default function AgentStudio() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Agent Studio</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        The same four agents below can be orchestrated by either framework (Phase 6) — pick one on the Plan a
-        Trip form. Only the sequencing engine changes; the agents&apos; own prompts, JSON contracts, and (for the
-        itinerary step) real geocoding logic stay identical either way.
-      </p>
+      <PageHeader
+        icon="AI-Engineering/agent.svg"
+        title="Agent Studio"
+        description="The same four agents below can be orchestrated by either framework (Phase 6) — pick one on the Plan a Trip form. Only the sequencing engine changes; the agents' own prompts, JSON contracts, and (for the itinerary step) real geocoding logic stay identical either way."
+      />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
 

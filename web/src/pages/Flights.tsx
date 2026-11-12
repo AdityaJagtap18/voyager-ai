@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { FlightOffer, PlaceSuggestion } from "../types";
 
 function PlacePicker({
@@ -93,10 +94,11 @@ export default function Flights() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Flights</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Real one-way flight search (Phase 3) — live results, not GPT-generated placeholders.
-      </p>
+      <PageHeader
+        icon="Travel/flights.svg"
+        title="Flights"
+        description="Real one-way flight search (Phase 3) — live results, not GPT-generated placeholders."
+      />
 
       <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <PlacePicker label="From" placeholder="e.g. Mumbai" value={origin} onChange={setOrigin} />

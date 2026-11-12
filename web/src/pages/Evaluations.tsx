@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { EvaluationRunDetail, EvaluationRunSummary, FrameworkInfo, ModelInfo } from "../types";
 
 export default function Evaluations() {
@@ -56,12 +57,11 @@ export default function Evaluations() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Evaluations</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        A fixed set of canned trip-planning cases (Phase 8), graded automatically on whether planning actually
-        succeeded and produced attractions and an itinerary — catches real breakage (a provider outage, a
-        misconfigured key, a broken agent), not itinerary quality.
-      </p>
+      <PageHeader
+        icon="AI-Engineering/evaluation.svg"
+        title="Evaluations"
+        description="A fixed set of canned trip-planning cases (Phase 8), graded automatically on whether planning actually succeeded and produced attractions and an itinerary — catches real breakage (a provider outage, a misconfigured key, a broken agent), not itinerary quality."
+      />
 
       <form onSubmit={handleRun} className="mb-8 flex flex-wrap items-end gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <label className="flex flex-col gap-1 text-sm font-medium">

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { HotelOffer, PlaceSuggestion } from "../types";
 
 export default function Hotels() {
@@ -45,10 +46,11 @@ export default function Hotels() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Hotels</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        Real hotel search (Phase 3) — live availability and pricing, not GPT-generated placeholders.
-      </p>
+      <PageHeader
+        icon="Travel/hotels.svg"
+        title="Hotels"
+        description="Real hotel search (Phase 3) — live availability and pricing, not GPT-generated placeholders."
+      />
 
       <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <label className="relative flex flex-1 min-w-[220px] flex-col gap-1 text-sm font-medium">

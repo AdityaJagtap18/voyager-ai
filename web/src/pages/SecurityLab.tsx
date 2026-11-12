@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, ApiError } from "../api/client";
+import PageHeader from "../components/PageHeader";
 import type { GuardrailEventSummary, GuardrailScanResult } from "../types";
 
 function RiskBadge({ risk }: { risk: string }) {
@@ -47,12 +48,11 @@ export default function SecurityLab() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Security Lab</h1>
-      <p className="mb-6 max-w-2xl text-sm text-ink-500">
-        A heuristic prompt-injection scanner (Phase 9) guards the two places user text flows straight into an
-        agent's LLM prompt — RAG knowledge notes and a trip's destination. Try a prompt-injection attempt below,
-        or watch what it's already caught in the log.
-      </p>
+      <PageHeader
+        icon="AI-Engineering/security.svg"
+        title="Security Lab"
+        description="A heuristic prompt-injection scanner (Phase 9) guards the two places user text flows straight into an agent's LLM prompt — RAG knowledge notes and a trip's destination. Try a prompt-injection attempt below, or watch what it's already caught in the log."
+      />
 
       <form onSubmit={handleScan} className="mb-8 flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Test a prompt</h2>

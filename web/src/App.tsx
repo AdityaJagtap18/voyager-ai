@@ -35,6 +35,7 @@ export default function App() {
               title="Bookings & Wallet"
               description="Flight/hotel references, confirmation status and costs, per trip."
               tab="bookings"
+              icon="Navigation/bookings.svg"
             />
           }
         />
@@ -45,6 +46,7 @@ export default function App() {
               title="Budget & Expenses"
               description="Set a budget target and track spending against it, per trip."
               tab="budget"
+              icon="Navigation/budget.svg"
             />
           }
         />
