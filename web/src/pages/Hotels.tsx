@@ -52,7 +52,7 @@ export default function Hotels() {
         description="Real hotel search (Phase 3) — live availability and pricing, not GPT-generated placeholders."
       />
 
-      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <label className="relative flex w-full min-w-[220px] flex-1 flex-col gap-1 text-sm font-medium sm:w-auto">
           Destination
           <input
@@ -115,7 +115,7 @@ export default function Hotels() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {offers.length === 0 && <p className="text-sm text-ink-500">No hotels found for those dates.</p>}
           {offers.map((h) => (
-            <div key={h.hotel_id} className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+            <div key={h.hotel_id} className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
               {h.photo_url && <img src={h.photo_url} alt={h.name ?? ""} className="h-36 w-full object-cover" />}
               <div className="p-4">
                 <p className="font-semibold text-ink-900">{h.name}</p>

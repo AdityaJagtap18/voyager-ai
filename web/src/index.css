@@ -7,6 +7,17 @@ html, body, #root {
 }
 
 body {
-  @apply bg-surface text-ink-900;
-  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  @apply bg-surface text-ink-900 font-sans antialiased;
+}
+
+* {
+  scrollbar-color: #D5DAE8 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: #D5DAE8;
+  border-radius: 9999px;
 }

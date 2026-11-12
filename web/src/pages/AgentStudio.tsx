@@ -32,7 +32,7 @@ export default function AgentStudio() {
       {frameworks && (
         <div className="mb-8 grid gap-3 sm:grid-cols-2">
           {frameworks.map((f) => (
-            <div key={f.id} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+            <div key={f.id} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
               <div className="mb-1 flex items-center gap-2">
                 <span className="font-semibold text-ink-900">{f.label}</span>
                 {f.available ? (
@@ -54,7 +54,7 @@ export default function AgentStudio() {
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Agent Roster</h2>
       {!agents && !error && <p className="text-sm text-ink-500">Loading…</p>}
       {agents && (
-        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink-900/5 text-xs uppercase tracking-wide text-ink-500">
               <tr>

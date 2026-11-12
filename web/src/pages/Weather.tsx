@@ -30,7 +30,7 @@ export default function Weather() {
         description="Real forecast data from OpenWeatherMap (Phase 3) — the free tier only looks 5 days ahead, so a trip further out won't show a full-length forecast here."
       />
 
-      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <label className="flex flex-1 min-w-[220px] flex-col gap-1 text-sm font-medium">
           Destination
           <input
@@ -61,7 +61,7 @@ export default function Weather() {
           {forecast.days.length === 0 && <p className="text-sm text-ink-500">No forecast data available.</p>}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {forecast.days.map((d) => (
-              <div key={d.date} className="rounded-xl2 border border-ink-900/5 bg-white p-4 text-center">
+              <div key={d.date} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-center">
                 <p className="text-xs font-medium text-ink-500">{d.date}</p>
                 {d.icon && (
                   <img

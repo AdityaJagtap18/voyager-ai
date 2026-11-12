@@ -43,7 +43,7 @@ export default function TripShare({ tripId, initialToken }: { tripId: string; in
   }
 
   return (
-    <div className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+    <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
       <p className="mb-1 text-sm font-medium text-ink-900">Share with travel companions</p>
       <p className="mb-3 text-xs text-ink-500">
         Anyone with the link can view this trip's itinerary, restaurants, and accommodations — read-only, no

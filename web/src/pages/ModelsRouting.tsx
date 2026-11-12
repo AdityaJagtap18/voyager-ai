@@ -33,7 +33,7 @@ export default function ModelsRouting() {
       {!models && !error && <p className="text-sm text-ink-500">Loading…</p>}
 
       {models && (
-        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink-900/5 text-xs uppercase tracking-wide text-ink-500">
               <tr>

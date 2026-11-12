@@ -68,7 +68,7 @@ export default function RagKnowledge() {
       />
 
       <div className="mb-8 grid gap-6 lg:grid-cols-2">
-        <form onSubmit={handleAdd} className="flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
+        <form onSubmit={handleAdd} className="flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Add a note</h2>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Destination
@@ -112,7 +112,7 @@ export default function RagKnowledge() {
           </button>
         </form>
 
-        <form onSubmit={handleSearch} className="flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
+        <form onSubmit={handleSearch} className="flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Search</h2>
           <label className="flex flex-col gap-1 text-sm font-medium">
             Query
@@ -165,7 +165,7 @@ export default function RagKnowledge() {
       {loadError && <p className="text-sm text-rose-600">{loadError}</p>}
       {documents.length === 0 && !loadError && <p className="text-sm text-ink-500">No notes added yet.</p>}
       {documents.length > 0 && (
-        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink-900/5 text-xs uppercase tracking-wide text-ink-500">
               <tr>

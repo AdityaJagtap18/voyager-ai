@@ -38,7 +38,7 @@ export default function TripBookings({ tripId }: { tripId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-4">
+      <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
         <label className="flex flex-col gap-1 text-xs font-medium">
           Type
           <select value={type} onChange={(e) => setType(e.target.value)} className="rounded-lg border border-ink-900/10 px-2 py-1.5 text-sm">
@@ -88,7 +88,7 @@ export default function TripBookings({ tripId }: { tripId: string }) {
 
       <div className="flex flex-col gap-3">
         {bookings.map((b) => (
-          <div key={b.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-4">
+          <div key={b.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
             <div>
               <p className="font-semibold capitalize">
                 {b.type} — {b.title}

@@ -28,7 +28,7 @@ export default function Home() {
 
   return (
     <div className="flex flex-col gap-8">
-      <section className="relative isolate overflow-hidden rounded-xl2 bg-gradient-to-br from-indigo-600 via-brand-600 to-sky-600 px-6 py-12 text-white sm:px-10 sm:py-16">
+      <section className="relative isolate overflow-hidden rounded-xl2 bg-gradient-to-br from-indigo-600 via-brand-600 to-sky-600 px-6 py-12 text-white shadow-card-hover sm:px-10 sm:py-16">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-25"
@@ -38,25 +38,29 @@ export default function Home() {
           }}
         />
         <div className="relative">
-          <h1 className="text-2xl font-bold sm:text-3xl">Plan · Book · Travel · Build with AI</h1>
-          <p className="mt-2 text-brand-50">Your intelligent travel companion and AI engineering playground.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <h1 className="text-balance text-2xl font-extrabold tracking-tight sm:text-4xl">
+            Plan · Book · Travel · Build with AI
+          </h1>
+          <p className="mt-3 max-w-md text-brand-50 sm:text-base">
+            Your intelligent travel companion and AI engineering playground.
+          </p>
+          <div className="mt-7 flex flex-wrap gap-3">
             <Link
               to="/plan"
-              className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-700 hover:bg-brand-50"
+              className="flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-700 shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-50 active:translate-y-0"
             >
               <img src="/icons/Travel/flights.svg" alt="" className="h-4 w-4" aria-hidden="true" />
               Plan a Trip
             </Link>
             <Link
               to="/ai/agent-studio"
-              className="rounded-lg border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20"
+              className="rounded-lg border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-transform hover:-translate-y-0.5 hover:bg-white/20 active:translate-y-0"
             >
               AI Engineering
             </Link>
             <Link
               to="/trips"
-              className="rounded-lg border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/20"
+              className="rounded-lg border border-white/40 bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-transform hover:-translate-y-0.5 hover:bg-white/20 active:translate-y-0"
             >
               My Trips
             </Link>
@@ -69,9 +73,11 @@ export default function Home() {
           <Link
             key={link.label}
             to={link.to}
-            className="flex flex-col items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white p-4 text-center transition-shadow hover:shadow-md"
+            className="group flex flex-col items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
           >
-            <span className={`flex h-11 w-11 items-center justify-center rounded-xl ${link.tint}`}>
+            <span
+              className={`flex h-11 w-11 items-center justify-center rounded-xl ${link.tint} transition-transform duration-200 group-hover:scale-110`}
+            >
               <img src={`/icons/${link.icon}`} alt="" className="h-6 w-6" />
             </span>
             <p className="text-sm font-semibold">{link.label}</p>

@@ -54,7 +54,7 @@ export default function SecurityLab() {
         description="A heuristic prompt-injection scanner (Phase 9) guards the two places user text flows straight into an agent's LLM prompt — RAG knowledge notes and a trip's destination. Try a prompt-injection attempt below, or watch what it's already caught in the log."
       />
 
-      <form onSubmit={handleScan} className="mb-8 flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleScan} className="mb-8 flex flex-col gap-4 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">Test a prompt</h2>
         <textarea
           required
@@ -96,7 +96,7 @@ export default function SecurityLab() {
       {loadError && <p className="text-sm text-rose-600">{loadError}</p>}
       {events.length === 0 && !loadError && <p className="text-sm text-ink-500">No scans logged yet.</p>}
       {events.length > 0 && (
-        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink-900/5 text-xs uppercase tracking-wide text-ink-500">
               <tr>

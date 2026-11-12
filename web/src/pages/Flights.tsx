@@ -100,7 +100,7 @@ export default function Flights() {
         description="Real one-way flight search (Phase 3) — live results, not GPT-generated placeholders."
       />
 
-      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <PlacePicker label="From" placeholder="e.g. Mumbai" value={origin} onChange={setOrigin} />
         <PlacePicker label="To" placeholder="e.g. Goa" value={destination} onChange={setDestination} />
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -128,7 +128,7 @@ export default function Flights() {
         <div className="flex flex-col gap-3">
           {offers.length === 0 && <p className="text-sm text-ink-500">No flights found for that route/date.</p>}
           {offers.map((o, i) => (
-            <div key={i} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-4">
+            <div key={i} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
               <div>
                 <p className="font-semibold text-ink-900">
                   {o.origin} → {o.destination} · {o.airline ?? "Unknown airline"}

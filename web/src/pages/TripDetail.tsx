@@ -172,7 +172,7 @@ export default function TripDetail() {
           {tab === "itinerary" && trip.plan && (
             <div className="flex flex-col gap-4">
               {trip.plan.itinerary?.itinerary?.map((day) => (
-                <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+                <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
                   <h3 className="font-semibold">
                     Day {day.day} — {day.theme}
                   </h3>
@@ -196,7 +196,7 @@ export default function TripDetail() {
           {tab === "flights" && trip.plan && (
             <div className="flex flex-col gap-3">
               {(!trip.plan.flights || trip.plan.flights.length === 0) && (
-                <p className="rounded-xl2 border border-ink-900/5 bg-white p-4 text-sm text-ink-500">
+                <p className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-sm text-ink-500">
                   No real flight data for this trip.{" "}
                   {trip.origin
                     ? "The live flight search found no offers, or the provider errored — nothing was invented to fill the gap."
@@ -269,7 +269,7 @@ export default function TripDetail() {
           {tab === "transportation" && trip.plan && (
             <div className="flex flex-col gap-3">
               {!trip.plan.transportation && (
-                <p className="rounded-xl2 border border-ink-900/5 bg-white p-4 text-sm text-ink-500">
+                <p className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-sm text-ink-500">
                   No real transfer route for this trip. This only covers an airport-to-accommodation
                   drive, and only once accommodation is chosen — it needs an accommodation with coordinates.
                   Rental cars, taxi fares, and public transit aren't integrated (no provider), so nothing
@@ -277,7 +277,7 @@ export default function TripDetail() {
                 </p>
               )}
               {trip.plan.transportation && (
-                <div className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+                <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <p className="font-semibold">
                       {trip.plan.transportation.from} → {trip.plan.transportation.to}
@@ -302,7 +302,7 @@ export default function TripDetail() {
           {tab === "restaurants" && trip.plan && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {trip.plan.restaurants.map((r, i) => (
-                <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+                <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <p className="font-semibold">{r.name}</p>
                     {r.source === "real" ? (

@@ -93,7 +93,7 @@ export default function MyTrips() {
       )}
 
       {!loading && (alerts.length > 0 || failedTrips.length > 0) && (
-        <div className="mb-6 rounded-xl2 border border-amber-200 bg-amber-50 p-4">
+        <div className="mb-6 rounded-xl2 border border-amber-200 bg-amber-50 p-4 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Alerts</p>
           <ul className="mt-2 flex flex-col gap-1 text-sm text-amber-900">
             {failedTrips.map((t) => (
@@ -112,7 +112,7 @@ export default function MyTrips() {
       )}
 
       {!loading && upcoming.length > 0 && (
-        <div className="mb-6 rounded-xl2 border border-ink-900/5 bg-white p-4">
+        <div className="mb-6 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Upcoming, in order</p>
           <ul className="mt-2 flex flex-col gap-2">
             {upcoming.map((t) => (

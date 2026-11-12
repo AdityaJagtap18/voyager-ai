@@ -79,7 +79,7 @@ export default function PlanTrip() {
       />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-xl2 border border-ink-900/5 bg-white p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
           <div className="flex flex-col gap-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Trip basics</p>
             <label className="flex flex-col gap-1 text-sm font-medium">
@@ -209,7 +209,7 @@ export default function PlanTrip() {
         </form>
 
         <aside className="flex flex-col gap-4">
-          <div className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+          <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Preview</p>
             <p className="mt-2 text-lg font-semibold text-ink-900">{destination || "Your destination"}</p>
             <p className="text-sm text-ink-500">
@@ -219,7 +219,7 @@ export default function PlanTrip() {
             {origin && <p className="mt-1 text-xs text-ink-500">Flying from {origin}</p>}
           </div>
 
-          <div className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+          <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-500">
               What Voyager runs for you
             </p>

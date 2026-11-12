@@ -39,7 +39,7 @@ export default function SharedTrip() {
           {trip.plan && (
             <div className="flex flex-col gap-4">
               {trip.plan.itinerary?.itinerary?.map((day) => (
-                <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+                <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
                   <h3 className="font-semibold">
                     Day {day.day} — {day.theme}
                   </h3>

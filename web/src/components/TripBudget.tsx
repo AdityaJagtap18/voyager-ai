@@ -72,7 +72,7 @@ export default function TripBudget({
   return (
     <div className="flex flex-col gap-6">
       {(cheapestFlight || cheapestStay) && (
-        <div className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+        <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Live reference quotes</p>
           <p className="mt-1 text-xs text-ink-500">
             Real prices found while planning — not booked, and not counted in the totals below. Different
@@ -101,7 +101,7 @@ export default function TripBudget({
         </div>
       )}
 
-      <div className="rounded-xl2 border border-ink-900/5 bg-white p-5">
+      <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
         <form onSubmit={handleSetBudget} className="mb-4 flex items-end gap-3">
           <label className="flex flex-col gap-1 text-xs font-medium">
             Budget target (₹)
@@ -143,7 +143,7 @@ export default function TripBudget({
         </p>
       </div>
 
-      <form onSubmit={handleAddExpense} className="flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-4">
+      <form onSubmit={handleAddExpense} className="flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
         <label className="flex flex-col gap-1 text-xs font-medium">
           Category
           <select value={category} onChange={(e) => setCategory(e.target.value)} className="rounded-lg border border-ink-900/10 px-2 py-1.5 text-sm">
@@ -184,7 +184,7 @@ export default function TripBudget({
 
       <div className="flex flex-col gap-2">
         {expenses.map((e) => (
-          <div key={e.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-3">
+          <div key={e.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-3">
             <div>
               <p className="text-sm font-medium capitalize">{e.category}</p>
               {e.description && <p className="text-xs text-ink-500">{e.description}</p>}

@@ -14,7 +14,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   }
 
   return (
-    <div className="flex items-center gap-2 border-b border-ink-900/5 bg-white px-4 py-3 sm:gap-4 sm:px-8">
+    <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-ink-900/5 bg-white/90 px-4 py-3 backdrop-blur-sm sm:gap-4 sm:px-8">
       <button
         type="button"
         onClick={onMenuClick}
@@ -26,8 +26,8 @@ export default function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         </svg>
       </button>
       <form onSubmit={handleSearch} className="min-w-0 flex-1 sm:max-w-xl">
-        <div className="flex items-center gap-2 rounded-lg border border-ink-900/10 bg-surface px-3 py-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6680" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <div className="flex items-center gap-2 rounded-lg border border-transparent bg-surface px-3 py-2 transition-colors focus-within:border-brand-400 focus-within:bg-white focus-within:ring-2 focus-within:ring-brand-100">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6680" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="shrink-0">
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" />
           </svg>
@@ -53,7 +53,7 @@ export default function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
           </svg>
         </button>
         {notifOpen && (
-          <div className="absolute right-12 top-11 w-56 rounded-lg border border-ink-900/10 bg-white p-3 text-sm text-ink-500 shadow-lg">
+          <div className="absolute right-12 top-11 w-56 rounded-lg border border-ink-900/10 bg-white p-3 text-sm text-ink-500 shadow-card-hover">
             No new notifications yet.
           </div>
         )}

@@ -148,7 +148,7 @@ export default function Maps() {
         description="Real routing (Phase 3), via OpenRouteService — driving distance/duration between two places, drawn on an OpenStreetMap base map."
       />
 
-      <form onSubmit={handleSearch} className="mb-6 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleSearch} className="mb-6 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <PlacePicker label="From" placeholder="e.g. Mumbai" value={origin} onChange={setOrigin} />
         <PlacePicker label="To" placeholder="e.g. Goa" value={destination} onChange={setDestination} />
         <button

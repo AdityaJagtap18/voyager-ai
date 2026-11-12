@@ -41,7 +41,7 @@ export default function TripDocuments({ tripId }: { tripId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-4">
+      <div className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
         <div>
           <p className="text-sm font-medium text-ink-900">Attach a document</p>
           <p className="text-xs text-ink-500">Tickets, vouchers, passport scans — up to 10MB.</p>
@@ -58,7 +58,7 @@ export default function TripDocuments({ tripId }: { tripId: string }) {
 
       <div className="flex flex-col gap-2">
         {documents.map((d) => (
-          <div key={d.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-4">
+          <div key={d.id} className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
             <div>
               <p className="text-sm font-medium text-ink-900">{d.filename}</p>
               <p className="text-xs text-ink-500">{formatSize(d.size_bytes)}</p>

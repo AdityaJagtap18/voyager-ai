@@ -63,7 +63,7 @@ export default function Evaluations() {
         description="A fixed set of canned trip-planning cases (Phase 8), graded automatically on whether planning actually succeeded and produced attractions and an itinerary — catches real breakage (a provider outage, a misconfigured key, a broken agent), not itinerary quality."
       />
 
-      <form onSubmit={handleRun} className="mb-8 flex flex-wrap items-end gap-4 rounded-xl2 border border-ink-900/5 bg-white p-6">
+      <form onSubmit={handleRun} className="mb-8 flex flex-wrap items-end gap-4 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
         <label className="flex flex-col gap-1 text-sm font-medium">
           Model <span className="font-normal text-ink-500">(optional)</span>
           <select
@@ -106,7 +106,7 @@ export default function Evaluations() {
       </form>
 
       {latest && (
-        <div className="mb-8 rounded-xl2 border border-ink-900/5 bg-white p-6">
+        <div className="mb-8 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">
               Run {latest.id.slice(0, 8)} · {latest.framework ?? "langgraph"} · {latest.model ?? "default"}
@@ -138,7 +138,7 @@ export default function Evaluations() {
       {loadError && <p className="text-sm text-rose-600">{loadError}</p>}
       {runs.length === 0 && !loadError && <p className="text-sm text-ink-500">No evaluation runs yet.</p>}
       {runs.length > 0 && (
-        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+        <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">
             <thead className="bg-ink-900/5 text-xs uppercase tracking-wide text-ink-500">
               <tr>

@@ -12,7 +12,7 @@ function StatusDot({ status }: { status: string }) {
 
 function StatTile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl2 border border-ink-900/5 bg-white p-4">
+    <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
       <p className="text-xs font-medium text-ink-500">{label}</p>
       <p className="mt-1 text-2xl font-bold text-ink-900">{value}</p>
       {sub && <p className="mt-1 text-xs text-ink-500">{sub}</p>}
@@ -90,7 +90,7 @@ export default function Observability() {
 
       {trips && trips.length > 0 && (
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-          <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white">
+          <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
             {trips.map((t) => (
               <button
                 key={t.id}
@@ -112,7 +112,7 @@ export default function Observability() {
             {detailError && <p className="text-sm text-rose-600">{detailError}</p>}
             {!detail && !detailError && <p className="text-sm text-ink-500">Loading…</p>}
             {detail && (
-              <div className="rounded-xl2 border border-ink-900/5 bg-white p-6">
+              <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-ink-900">{detail.destination}</h2>

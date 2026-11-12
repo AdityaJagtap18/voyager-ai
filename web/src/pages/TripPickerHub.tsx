@@ -44,7 +44,7 @@ export default function TripPickerHub({
           <Link
             key={trip.id}
             to={`/trips/${trip.id}?tab=${tab}`}
-            className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white p-4 hover:shadow-md"
+            className="flex items-center justify-between rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 hover:shadow-md"
           >
             <div>
               <p className="font-semibold">{trip.destination}</p>
