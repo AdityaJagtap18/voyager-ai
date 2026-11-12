@@ -661,3 +661,30 @@ deleted from the live database (confirmed 404 on both) by the time this was inve
 original failure couldn't be replayed against live data - the cache-versioning fix addresses the whole
 class of bug regardless. Real-time/transport, airport-transfer, and local-transport recommendations
 were not touched by this fix (they already worked correctly on repeated navigation).
+
+### Follow-up: a second, unrelated trip ("Mumbai") with empty flights/transport/accommodations
+
+A different real trip (Pune → Mumbai) showed "No real flight data", "No real transfer route", and
+every accommodation as an "AI suggestion" instead of "Live pricing". Checking the backend log for that
+trip's planning run found the actual cause, confirmed live:
+
+- `ORS_API_KEY`'s geocoding is returning `403 Quota exceeded` right now (checked live via
+  `services.ors_api.geocode`) - this is why Transportation has no real route and why LLM-suggested
+  accommodations have no coordinates/distance scoring. It's an OpenRouteService account-level quota,
+  not something the app can work around; it will need the quota to reset or the plan upgraded.
+- The Booking.com hotels API (`services/hotels_api.py`) is returning `429 ... exceeded the MONTHLY
+  quota for requests on your current plan, BASIC` right now (also checked live) - this is why
+  accommodations fell back to LLM suggestions for this trip, same as the quota-exceeded cause above.
+- Flights, by contrast, searched successfully when re-tested directly against the live provider for
+  the same origin/destination/date (5 real IndiGo/Star Air/Air India offers came back) - so this trip's
+  empty `flights: []` was a one-off blip during that specific planning run, not an ongoing outage. But
+  `services/flights_api.py`'s `search_flights_for_trip()` swallowed every failure path (unresolved
+  place, no offers, provider error) with zero logging, so there was no way to tell a quota/network blip
+  apart from "genuinely no flights exist" after the fact. Fixed by adding a `logger.warning()` on each
+  of those paths, so a future empty-flights case is diagnosable from the server log instead of being a
+  silent dead end.
+
+**Not fixed, and out of scope for this session**: the ORS and Booking.com quota exhaustion itself
+(these are external account limits - upgrading either plan or waiting for the quota window to reset is
+the only remedy) and re-running flight/accommodation search for this specific already-planned Mumbai
+trip (would need a new "refresh real data on an existing trip" endpoint, which doesn't exist yet).

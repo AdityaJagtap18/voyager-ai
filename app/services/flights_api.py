@@ -14,6 +14,8 @@ import os
 from typing import Optional
 import requests
 
+from utils.logger import logger
+
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 HOST = "flights-sky.p.rapidapi.com"
 BASE_URL = f"https://{HOST}"
@@ -122,18 +124,23 @@ def search_flights_for_trip(origin_query: str, destination_query: str, depart_da
     try:
         origin_matches = autocomplete_place(origin_query)
         if not origin_matches:
+            logger.warning(f"Real flights: no autocomplete match for origin '{origin_query}', skipping")
             return None
         dest_matches = autocomplete_place(destination_query)
         if not dest_matches:
+            logger.warning(f"Real flights: no autocomplete match for destination '{destination_query}', skipping")
             return None
 
         origin_sky_id = origin_matches[0]["sky_id"]
         dest_sky_id = dest_matches[0]["sky_id"]
         if not origin_sky_id or not dest_sky_id:
+            logger.warning(f"Real flights: autocomplete match for '{origin_query}' -> '{destination_query}' had no skyId, skipping")
             return None
 
         offers = search_one_way(origin_sky_id, dest_sky_id, depart_date)
         if not offers:
+            logger.warning(f"Real flights: no offers for {origin_sky_id} -> {dest_sky_id} on {depart_date}; "
+                            "no flight data shown (flights have no LLM fallback, by design)")
             return None
 
         for offer in offers:
@@ -141,5 +148,6 @@ def search_flights_for_trip(origin_query: str, destination_query: str, depart_da
             offer["origin_query"] = origin_matches[0]["title"]
             offer["destination_query"] = dest_matches[0]["title"]
         return offers[:limit]
-    except FlightsAPIError:
+    except FlightsAPIError as exc:
+        logger.warning(f"Real flights lookup failed, no flight data shown (flights have no LLM fallback): {exc}")
         return None
