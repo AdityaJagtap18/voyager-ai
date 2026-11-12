@@ -27,6 +27,18 @@ export default function TripDetail() {
   const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
 
+  function formatDateTime(iso: string | null): string {
+    if (!iso) return "N/A";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
   function refresh() {
     if (!id) return;
     api
@@ -71,20 +83,28 @@ export default function TripDetail() {
         ← Back to Trips
       </Link>
 
-      <div className="mt-2 mb-1 flex items-center gap-3">
+      <div className="mt-2 mb-1 flex items-start gap-3">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50">
           <img src="/icons/Travel/itinerary.svg" alt="" className="h-5 w-5" aria-hidden="true" />
         </span>
-        <h1 className="text-2xl font-bold">{trip.destination}</h1>
-        <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">{trip.status}</span>
-        {trip.model && (
-          <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">{trip.model}</span>
-        )}
-        {trip.framework && (
-          <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">
-            {trip.framework}
-          </span>
-        )}
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold">{trip.destination}</h1>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
+              {trip.status}
+            </span>
+            {trip.model && (
+              <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">
+                {trip.model}
+              </span>
+            )}
+            {trip.framework && (
+              <span className="rounded-full bg-ink-900/5 px-2.5 py-1 text-xs font-medium text-ink-500">
+                {trip.framework}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
       <p className="mb-6 ml-12 text-sm text-ink-500">
@@ -111,7 +131,8 @@ export default function TripDetail() {
 
       {trip.status !== "planning" && (
         <>
-          <div className="mb-4 flex gap-2 overflow-x-auto border-b border-ink-900/10">
+          <div className="relative mb-4 border-b border-ink-900/10">
+            <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {(trip.plan
               ? ([
                   "itinerary",
@@ -136,6 +157,11 @@ export default function TripDetail() {
                 {t === "bookings" ? "Bookings & Wallet" : t === "budget" ? "Budget & Expenses" : t}
               </button>
             ))}
+            </div>
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute right-0 top-0 bottom-px w-8 bg-gradient-to-l from-white to-transparent"
+            />
           </div>
 
           {tab === "bookings" && <TripBookings tripId={trip.id} />}
@@ -218,7 +244,7 @@ export default function TripDetail() {
                       {f.duration_minutes != null && ` · ${Math.round(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`}
                     </p>
                     <p className="mt-1 text-xs text-ink-500">
-                      Departs {f.departure ?? "N/A"} · Arrives {f.arrival ?? "N/A"}
+                      Departs {formatDateTime(f.departure)} · Arrives {formatDateTime(f.arrival)}
                     </p>
                     {bookingUrl && (
                       <a
