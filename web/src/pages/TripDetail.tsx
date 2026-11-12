@@ -114,7 +114,7 @@ export default function TripDetail() {
           </div>
 
           {tab === "bookings" && <TripBookings tripId={trip.id} />}
-          {tab === "budget" && <TripBudget tripId={trip.id} budgetAmount={trip.budget_amount} />}
+          {tab === "budget" && <TripBudget tripId={trip.id} budgetAmount={trip.budget_amount} plan={trip.plan} />}
           {tab === "documents" && <TripDocuments tripId={trip.id} />}
           {tab === "share" && <TripShare tripId={trip.id} initialToken={trip.share_token} />}
 

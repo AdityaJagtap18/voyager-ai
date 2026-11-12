@@ -210,6 +210,11 @@ class AccommodationAgent:
                     "price_per_night": offer.get("price_formatted") or (
                         f"{offer['price_raw']} {offer['currency']}" if offer.get("price_raw") is not None else "N/A"
                     ),
+                    # Numeric fields alongside the display string (Phase 10 budget rollup) so a
+                    # real nightly rate can be shown/summed without parsing "price_per_night"'s
+                    # free-text formatting - never derived from it, straight from the provider.
+                    "price_raw": offer.get("price_raw"),
+                    "currency": offer.get("currency"),
                     "rating": rating,
                     "amenities": [],
                     "best_for": "all travelers",

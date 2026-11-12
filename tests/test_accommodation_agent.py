@@ -82,6 +82,8 @@ def test_find_accommodations_uses_real_hotels_when_start_date_given(monkeypatch)
     assert acc["name"] == "Taj Fort Aguada Resort"
     assert acc["source"] == "real"
     assert acc["price_per_night"] == "$150"
+    assert acc["price_raw"] == 150.0
+    assert acc["currency"] == "USD"
     assert acc["coordinates"] == {"lat": 15.49, "lng": 73.76}
     assert acc["rating"] == "8.9/10"
     assert captured_dates == {"checkin": "2026-12-10", "checkout": "2026-12-15"}

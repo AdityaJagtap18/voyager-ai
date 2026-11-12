@@ -229,3 +229,47 @@ the quota didn't allow demonstrating it live today.
 estimates, public-transit schedules/fares, intercity transport options - all need a provider this
 project doesn't have access to; the adapter-interface pattern here (`TransportAgent`, returning
 `None` on any failure) is the template a future provider integration would slot into.
+
+## Phase 10 (third slice) — labeled real-vs-estimated budget rollup
+
+Third slice of the expansion request's budget-intelligence section: "never mix estimated
+LLM-generated costs with confirmed provider prices without clearly labeling them."
+
+**What was built**: `TripBudget.tsx` (the Budget & Expenses tab) now shows two clearly separated
+things instead of one blurred number:
+
+- **"Live reference quotes"** - the cheapest real (`source: "real"`) flight offer and real
+  accommodation nightly rate found during planning, each with its own currency shown as returned
+  (no fabricated FX conversion or combining different currencies into one figure). Explicitly
+  labeled "not booked, and not counted in the totals below" - these are informational, not summed,
+  since summing every alternative search result would misrepresent them as cumulative cost.
+- **Committed total vs. budget target** - unchanged target-tracking UI, but now sums **confirmed
+  bookings** (`Booking` rows with `status: "confirmed"`) together with **logged expenses**
+  (`Expense` rows, unchanged), broken out separately in a caption ("Confirmed bookings: ₹X · Logged
+  expenses: ₹Y"). Pending/cancelled bookings and AI-estimated accommodation/dining price ranges are
+  explicitly excluded from this total and stated as excluded, rather than parsed and summed - an
+  LLM-generated range like "₹2000–3500" has no reliable single numeric value, and guessing one
+  would be exactly the kind of estimated-vs-confirmed mixing this requirement forbids.
+- Backend: `accommodation_agent.py`'s real-hotel fusion (`_get_real_hotels`) now also carries
+  `price_raw`/`currency` numeric fields alongside the existing display string `price_per_night`, so
+  the frontend can show/compare a real nightly rate without parsing free-text formatting - never
+  derived from the display string, straight from the provider's own numeric field.
+
+**What was deliberately not attempted**: a single grand total across real flights + real
+accommodation + LLM-estimated dining/activities + confirmed bookings + logged expenses. Building
+one number out of sources with different confidence levels and different currencies would be the
+literal violation this requirement warns against, so the rollup keeps those sources visually and
+textually separate instead. Per-traveler cost division was also not added - the `Trip` model has no
+traveler-count field yet (a separate, scoped addition if wanted).
+
+**Tests**: `tests/test_accommodation_agent.py`'s real-hotel test extended to assert the new
+`price_raw`/`currency` fields. `tsc --noEmit` clean. 206 backend tests still pass (no backend
+contract change beyond the two new accommodation fields).
+
+**Live-verified** (third approved backend restart): created a trip with a real flight search,
+set a ₹20,000 budget target, added one confirmed ₹4,500 booking and one logged ₹1,200 expense.
+The Budget tab correctly showed "$45 USD cheapest live flight (Air India Express)" in the live-quotes
+card (not counted in the total) and "₹5,700 committed of ₹20,000" with the ₹4,500/₹1,200 breakdown
+caption - confirmed via screenshot. This trip's real-hotel search fell back to the LLM path (no
+real accommodation offers found for this query), so the accommodation live-quote card correctly did
+not render rather than showing nothing or a fabricated placeholder.

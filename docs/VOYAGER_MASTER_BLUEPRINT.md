@@ -469,6 +469,27 @@ allow demonstrating it live.
 **Still gaps** (unchanged): rental-car listings, taxi fares, public-transit schedules/fares,
 intercity transport - no provider integrated for any of them.
 
+### Phase 10 (third slice) — labeled real-vs-estimated budget rollup
+
+Adds the budget-intelligence requirement's core rule - "never mix estimated LLM-generated costs
+with confirmed provider prices without clearly labeling them" - instead of computing one blended
+trip total. `TripBudget.tsx` now shows a "Live reference quotes" card (cheapest real flight/
+accommodation price found while planning, each in its own currency, explicitly "not booked, not
+counted in the totals below") separate from a "committed total" that sums only confirmed
+`Booking` rows plus logged `Expense` rows against the budget target, with a caption breaking out
+exactly how much came from each source. AI-estimated accommodation/dining price ranges are
+explicitly excluded and named as excluded, rather than parsed into a number - an LLM-generated
+range like "₹2000-3500" has no single reliable value, and guessing one would be the exact mixing
+this rule forbids. `accommodation_agent.py`'s real-hotel fusion now also carries `price_raw`/
+`currency` numeric fields so the frontend never has to parse the display string. 206 tests pass;
+`tsc --noEmit` clean. Live-verified (third approved backend restart): a real flight's cheapest
+live quote and a confirmed-booking-plus-logged-expense committed total both rendered correctly and
+separately, per screenshot.
+
+**Not attempted**: one grand total spanning real + estimated + confirmed sources (would itself be
+the violation), and per-traveler division (no traveler-count field on `Trip` yet - a separate,
+scoped addition).
+
 ## Next step
 
-Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first two slices (real flight grounding, real transportation discovery) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, the full My Trips command center, and unified budget intelligence — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
+Phases 0–9 (including the implementation audit/UI-fidelity pass, functional regression, and 8-breakpoint responsive fix above) are complete for the scope done so far. Phase 10's first three slices (real flight grounding, real transportation discovery, labeled budget rollup) are also complete and live-verified, above. What's left of the "CRITICAL PRODUCT EXPANSION" request — rental-car/taxi/transit provider integrations, activity/tour ticketing, restaurant-reservation booking, the unified trip proposal's independent-selection/recalculation architecture, Level 3 direct booking, and the full My Trips command center — remains open, each a separate scoped increment per the audit's gap list, not to be faked to look done. A real multi-user auth system (flagged as a gap in Section 2.2) is also still a clear, named prerequisite if true multi-user features are ever wanted. Trip Detail's deeper visual work (AI Insights panel, day-by-day map) and a formal accessibility audit remain open if the UI-fidelity work continues further.
