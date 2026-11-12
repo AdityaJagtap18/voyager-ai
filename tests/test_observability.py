@@ -141,6 +141,24 @@ def test_redact_attributes_does_not_mutate_input():
     assert original["api_key"] == "secret"
 
 
+def test_redact_attributes_keeps_token_usage_counts():
+    """Regression: a plain substring match for "token" also matched inside
+    "tokens" (plural, a count) - wiping out llm.usage.*_tokens as if they
+    were credentials. These must survive redaction untouched."""
+    out = redact_attributes(
+        {"llm.usage.input_tokens": 120, "llm.usage.output_tokens": 45, "llm.usage.total_tokens": 165}
+    )
+    assert out["llm.usage.input_tokens"] == 120
+    assert out["llm.usage.output_tokens"] == 45
+    assert out["llm.usage.total_tokens"] == 165
+
+
+def test_redact_attributes_still_redacts_singular_token_keys():
+    out = redact_attributes({"access_token": "abc123", "api_token": "xyz789"})
+    assert out["access_token"] == "[REDACTED]"
+    assert out["api_token"] == "[REDACTED]"
+
+
 # --- Exporter failure isolation (Part 12) -----------------------------------
 
 

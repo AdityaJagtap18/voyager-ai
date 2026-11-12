@@ -9,9 +9,20 @@ whatever content *is* captured against accidentally including a credential).
 import re
 from typing import Any, Dict
 
-_SECRET_KEY_PATTERN = re.compile(
-    r"(api[_-]?key|authorization|secret|password|token|access[_-]?key|client[_-]?secret)", re.IGNORECASE
-)
+# Segment-based, not substring-based: a plain substring search for "token"
+# also matches inside "tokens" (plural - a count, e.g. llm.usage.total_tokens),
+# which was wiping out real token-usage numbers as if they were credentials.
+# Splitting on non-alphanumeric separators and checking exact segment
+# equality fixes that while still catching "access_token", "api-key", etc.
+_SENSITIVE_WORDS = {"authorization", "secret", "password", "token"}
+_SENSITIVE_PAIRS = {("api", "key"), ("access", "key")}
+
+
+def _is_sensitive_key(key: str) -> bool:
+    segments = [s.lower() for s in re.split(r"[^a-zA-Z0-9]+", key) if s]
+    if any(seg in _SENSITIVE_WORDS for seg in segments):
+        return True
+    return any((segments[i], segments[i + 1]) in _SENSITIVE_PAIRS for i in range(len(segments) - 1))
 
 # Matches common credential-shaped substrings inside otherwise-innocuous text
 # (a logged URL with a query-string key, a pasted curl command, etc.) - belt
@@ -41,7 +52,7 @@ def redact_attributes(attributes: Dict[str, Any]) -> Dict[str, Any]:
     read elsewhere after export)."""
     out: Dict[str, Any] = {}
     for key, value in attributes.items():
-        if _SECRET_KEY_PATTERN.search(key):
+        if _is_sensitive_key(key):
             out[key] = REDACTED
         else:
             out[key] = _redact_value(value)
