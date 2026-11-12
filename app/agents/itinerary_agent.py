@@ -18,6 +18,9 @@ class ItineraryAgent:
     BUFFER_TIME_HOURS = 0.25  # 15 minutes buffer between activities
     MAX_DAY_TRIP_DISTANCE = 100  # Maximum km for day trip attractions
     MAX_REASONABLE_DISTANCE = 50  # Maximum km from city center for geocoding validation
+    DAY_START_HOUR = 9.0  # Default day start, used when no user preference is given
+    DAY_END_HOUR = 21.0  # An activity starting at/after this hour is flagged as a conflict
+    MAX_ACTIVITIES_PER_DAY = 5  # Beyond this, flag day as overloaded rather than silently cramming it in
 
     def __init__(self, model: Optional[str] = None):
         """Initialize the agent with a chat model from the model gateway (Phase 5)"""
@@ -307,19 +310,35 @@ class ItineraryAgent:
             day_attractions = self._calculate_travel_times(day_attractions)
             
             day_schedule = []
-            current_time = 9  # Start at 9 AM
+            current_time = self.DAY_START_HOUR
             overflow_warning = False
-            
+
             for idx, attraction in enumerate(day_attractions):
                 # Check for day overflow
                 if current_time >= 24 and not overflow_warning:
                     logger.warning(f"  Day {day_num}: Schedule overflowing into next day!")
                     overflow_warning = True
-                
-                # Store scheduled time for attraction
+
+                # Store scheduled time for attraction. Every activity gets a
+                # distinct, sequential time here — never a shared constant —
+                # since current_time only advances, never resets, within a day.
                 attraction['scheduled_time'] = self._format_time_with_overflow(current_time)
+                attraction['travel_time_before_minutes'] = (
+                    int(day_attractions[idx - 1]['travel_to_next']['duration_h'] * 60)
+                    if idx > 0 and day_attractions[idx - 1].get('travel_to_next')
+                    else 0
+                )
+                attraction['time_source'] = 'estimated'
+                # Flagged, not silently hidden - a late start is reported as a
+                # conflict rather than producing an itinerary that pretends
+                # everything fits in the day.
+                effective_start = current_time % 24
+                attraction['scheduling_status'] = (
+                    'conflict' if (current_time >= 24 or (idx > 0 and effective_start >= self.DAY_END_HOUR))
+                    else 'ok'
+                )
                 day_schedule.append(attraction)
-                
+
                 # Parse and add duration
                 duration_hours = self._parse_duration(attraction.get('duration', '2 hours'))
                 current_time += duration_hours + self.BUFFER_TIME_HOURS  # Add buffer
@@ -371,6 +390,13 @@ class ItineraryAgent:
                             restaurant['is_meal'] = True
                             restaurant['meal_type_scheduled'] = meal_type
                             restaurant['scheduled_time'] = self._format_time_with_overflow(current_time)
+                            restaurant['travel_time_before_minutes'] = int(
+                                restaurant.get('distance_from_current', {}).get('duration_minutes', 0)
+                            )
+                            restaurant['time_source'] = 'estimated'
+                            restaurant['scheduling_status'] = (
+                                'conflict' if current_time % 24 >= self.DAY_END_HOUR or current_time >= 24 else 'ok'
+                            )
                             
                             # Calculate travel to next attraction if exists
                             if idx + 1 < len(day_attractions) and day_attractions[idx + 1].get('coordinates') and restaurant.get('coordinates'):
@@ -452,8 +478,21 @@ class ItineraryAgent:
         # Step 5: Optimize routes within each day
         daily_groups = self._optimize_daily_routes(daily_groups, accommodation_location)
         
-        # Step 6: Integrate dining if restaurants provided
-        if restaurants and accommodation_location:
+        # Step 6: Assign sequential times to every activity, and weave in meals
+        # when restaurant/accommodation data is available.
+        #
+        # BUG FIX: this used to be gated behind `if restaurants and
+        # accommodation_location:` — when either was falsy (e.g. the real
+        # accommodation search fell back to an LLM-sourced hotel with no
+        # coordinates, see accommodation_agent.py), _integrate_dining never
+        # ran at all, so no attraction ever got a `scheduled_time`, and
+        # _generate_complete_schedule's `.get('scheduled_time', '09:00')`
+        # fallback fired for every single activity. Time assignment must
+        # always run; dining is just an optional enhancement layered on top
+        # of it (_integrate_dining already degrades gracefully when
+        # `restaurants` is [] or `accommodation_location` is None — meals
+        # are simply skipped, attraction timing still proceeds).
+        if restaurants:
             # Geocode restaurants first
             for restaurant in restaurants:
                 if not restaurant.get('coordinates'):
@@ -467,12 +506,12 @@ class ItineraryAgent:
                             }
                     except:
                         pass
-            
-            daily_groups = self._integrate_dining(
-                daily_groups,
-                restaurants,
-                accommodation_location
-            )
+
+        daily_groups = self._integrate_dining(
+            daily_groups,
+            restaurants or [],
+            accommodation_location
+        )
         
         # Step 7: Create detailed schedule
         schedule = self._generate_complete_schedule(daily_groups, days, trip_type)
@@ -519,7 +558,13 @@ class ItineraryAgent:
                 # Check for overflow times
                 if item.get('scheduled_time', '').startswith('Day+'):
                     day_warnings.append(f"{item['name']} scheduled beyond day boundary")
-                
+                elif item.get('scheduling_status') == 'conflict':
+                    day_warnings.append(
+                        f"{item.get('name', 'An activity')} is a scheduling conflict - its estimated start "
+                        f"is too late in the day. Consider dropping an earlier activity or moving this to "
+                        f"another day."
+                    )
+
                 if item.get('is_meal'):
                     # This is a restaurant
                     activity = {
@@ -532,9 +577,14 @@ class ItineraryAgent:
                         "location": item.get('location', 'N/A'),
                         "must_try": item.get('must_try', ''),
                         "duration": "1 hour",
+                        "duration_minutes": 60,
+                        "travel_time_before_minutes": item.get('travel_time_before_minutes', 0),
+                        "time_source": item.get('time_source', 'unscheduled'),
+                        "booking_status": "not_booked",
+                        "scheduling_status": item.get('scheduling_status', 'ok'),
                         "description": f"{item.get('meal_type_scheduled', 'Meal').title()} at {item['name']}"
                     }
-                    
+
                     if item.get('distance_from_current'):
                         activity['travel_to_restaurant'] = {
                             'distance_km': round(item['distance_from_current']['distance_km'], 1),
@@ -550,12 +600,21 @@ class ItineraryAgent:
                     activities.append(activity)
                     
                 else:
-                    # This is an attraction
+                    # This is an attraction. `scheduled_time` is always set by
+                    # _integrate_dining now (see create_schedule) - the
+                    # fallback below only fires for data this agent never
+                    # scheduled at all, and is tagged time_source
+                    # "unscheduled" rather than silently passed off as real.
                     activity = {
                         "time": item.get('scheduled_time', '09:00'),
                         "type": "attraction",
                         "name": item.get("name", "Unknown"),
                         "duration": item.get('duration', '2 hours'),
+                        "duration_minutes": int(self._parse_duration(item.get('duration', '2 hours')) * 60),
+                        "travel_time_before_minutes": item.get('travel_time_before_minutes', 0),
+                        "time_source": item.get('time_source', 'unscheduled'),
+                        "booking_status": "not_booked",
+                        "scheduling_status": item.get('scheduling_status', 'ok'),
                         "category": item.get("category", "activity"),
                         "description": item.get("description", ""),
                         "notes": f"Best time: {item.get('best_time', 'anytime')}"
@@ -569,6 +628,13 @@ class ItineraryAgent:
                     
                     activities.append(activity)
             
+            attraction_count = len([a for a in activities if a.get('type') != 'meal'])
+            if attraction_count > self.MAX_ACTIVITIES_PER_DAY:
+                day_warnings.append(
+                    f"Day {day_num} has {attraction_count} attractions scheduled, which is more than "
+                    f"comfortably fits in a day - consider moving some to another day."
+                )
+
             # Calculate day end time (handling overflow)
             if activities:
                 last_activity_time = activities[-1]['time']

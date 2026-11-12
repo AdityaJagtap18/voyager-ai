@@ -69,6 +69,13 @@ export interface DayActivity {
   name: string;
   description?: string;
   duration?: string;
+  duration_minutes?: number;
+  travel_time_before_minutes?: number;
+  /** "estimated" - this agent computed it; "unscheduled" - no scheduling data at all, never a real booking slot. */
+  time_source?: "estimated" | "unscheduled";
+  booking_status?: "not_booked";
+  /** "conflict" - estimated start runs past a reasonable day-end hour, or past midnight. */
+  scheduling_status?: "ok" | "conflict";
   category?: string;
   meal_type?: string;
   cuisine?: string;

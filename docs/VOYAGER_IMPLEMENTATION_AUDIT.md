@@ -356,3 +356,75 @@ decision not to parse LLM-estimated price ranges), so there's no "affected budge
 recompute yet beyond what the Budget tab's live-quotes card already shows dynamically from
 whichever flight/accommodation happens to be cheapest - it doesn't yet prefer the *selected* one.
 That's a reasonable, small follow-on once this is wanted.
+
+## Bug fix — itinerary scheduling defaulted every activity to 09:00
+
+**Reported symptom**: the itinerary generator assigned 09:00 to practically every activity on a
+day, instead of a realistic chronological schedule.
+
+**Root cause** (`app/agents/itinerary_agent.py`): the actual per-activity time-assignment logic
+lives in `_integrate_dining()` - it walks each day's attractions in order, keeping a running
+`current_time` that advances by each activity's duration, a 15-minute buffer, and any travel time
+to the next one, then stamps that onto `scheduled_time`. That logic was correct. The bug was in
+`create_schedule()`: it only *called* `_integrate_dining()` inside `if restaurants and
+accommodation_location:`. Whenever either was falsy, `_integrate_dining()` never ran at all, so no
+attraction ever got a `scheduled_time` - and `_generate_complete_schedule()`'s
+`item.get('scheduled_time', '09:00')` fallback fired for literally every activity on the day,
+producing the reported pattern.
+
+`accommodation_location` (`best_accommodation_location` in both `app/workflow.py` and
+`app/orchestration/crewai_adapter.py`) is `None` whenever the first accommodation result lacks
+coordinates - which happens whenever the real hotel search falls back to an LLM-sourced
+accommodation (a known, already-documented intermittent behavior from the Phase 10 transportation
+slice). So this bug fired on a realistic, recurring path, not just an edge case.
+
+**Fix**: time assignment now always runs. `_integrate_dining()` is called unconditionally with
+`restaurants or []` and whatever `accommodation_location` is (including `None`) - it already
+degraded gracefully when either is missing (meal-matching is skipped, but the per-activity timing
+loop was never conditioned on either argument). The restaurant-geocoding prep step stays gated on
+`restaurants` being non-empty (no point geocoding nothing).
+
+**Also added**, per the full scheduling-fix request:
+
+- `time_source: "estimated"` on every scheduled activity/meal - there is no real per-activity
+  booking-slot provider in this codebase, so nothing is ever labeled as a confirmed time; the
+  label makes that explicit instead of presenting algorithmic estimates as fact.
+- `booking_status: "not_booked"` for the same reason.
+- `scheduling_status: "ok" | "conflict"` - an activity whose estimated start lands at/after 21:00,
+  or that overflows past midnight, is flagged rather than silently presented as part of a working
+  day. The day's `warnings` list explains which activity and why.
+- A day with more than 5 attractions is flagged with a day-level warning ("more than comfortably
+  fits") instead of silently cramming them all in back-to-back.
+- `duration_minutes` and `travel_time_before_minutes` on every activity, so the frontend doesn't
+  have to re-parse the free-text `duration` string or infer travel time from a neighboring
+  activity's `travel_after`.
+
+**Not built**: real per-activity opening-hours and confirmed-booking-slot scheduling - there's no
+provider integration for either in this codebase (attractions are LLM-researched or geocoded, not
+sourced from a bookable-slots API), so honoring "respect opening hours / confirmed booking slots"
+beyond what's structurally possible today would mean fabricating that data. The `time_source` /
+`scheduling_status` fields exist specifically so this gap stays visible instead of being papered
+over with invented certainty.
+
+**Frontend** (`TripDetail.tsx`, `types.ts`): the Itinerary tab now shows each activity's duration,
+any travel time before it, an "Estimated time" tag, and a "Scheduling conflict" tag when flagged;
+day-level warnings (conflicts, overloaded days, day-boundary overflow) render in an inline banner
+under the day's heading instead of being silently dropped.
+
+**Tests**: new `tests/test_itinerary_agent.py` (9 cases) - the exact reported failure pattern
+(multiple same-day activities, no restaurants, no accommodation location → times must be distinct
+and increasing, not all "09:00"); the same without restaurants for a different falsy-accommodation
+shape; no-overlap/duration-respecting consecutive scheduling; travel time reflected in the next
+activity's start; `time_source`/`booking_status` tagging; late-start conflict flagging; overloaded-
+day flagging; multi-day trips scheduling each day independently; and confirming dining integration
+still works when restaurant/accommodation data *is* available (the pre-existing correct path).
+Both LangGraph (`app/workflow.py`) and CrewAI (`app/orchestration/crewai_adapter.py`) call the same
+`ItineraryAgent.create_schedule()`, so the fix and its guarantees apply to both frameworks by
+construction - no framework-specific scheduling logic exists to diverge. Full suite: 230 passed
+(221 pre-existing + 9 new); `tsc --noEmit` clean.
+
+**Live-verified**: created a real trip (Jaipur, 1 day, no start date/origin - forcing the exact
+failure trigger, an LLM-sourced accommodation with `coordinates: None`) against the restarted
+backend. Before the fix this would have produced four activities all at "09:00"; after the fix the
+same trip produced `09:00, 10:15, 12:30, 13:45` - confirmed both via the raw API response and in
+the browser UI (desktop and mobile), each activity correctly tagged "Estimated time".

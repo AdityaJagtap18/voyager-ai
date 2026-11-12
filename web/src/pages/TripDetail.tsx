@@ -177,13 +177,38 @@ export default function TripDetail() {
                   <h3 className="font-semibold">
                     Day {day.day} — {day.theme}
                   </h3>
+                  {day.warnings && day.warnings.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                      {day.warnings.map((w, i) => (
+                        <p key={i}>{w}</p>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex flex-col gap-2">
                     {day.activities.map((activity, i) => (
                       <div key={i} className="flex gap-3 border-t border-ink-900/5 pt-2 first:border-t-0 first:pt-0">
                         <span className="w-16 shrink-0 text-xs font-medium text-ink-500">{activity.time}</span>
-                        <div>
-                          <p className="text-sm font-medium">{activity.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <p className="text-sm font-medium">{activity.name}</p>
+                            {activity.scheduling_status === "conflict" && (
+                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+                                Scheduling conflict
+                              </span>
+                            )}
+                            {activity.time_source === "estimated" && (
+                              <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-500">
+                                Estimated time
+                              </span>
+                            )}
+                          </div>
                           {activity.description && <p className="text-xs text-ink-500">{activity.description}</p>}
+                          <p className="mt-0.5 text-xs text-ink-400">
+                            {activity.duration && <>{activity.duration}</>}
+                            {!!activity.travel_time_before_minutes && (
+                              <> · {activity.travel_time_before_minutes} min travel before this</>
+                            )}
+                          </p>
                         </div>
                       </div>
                     ))}
