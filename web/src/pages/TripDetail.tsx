@@ -41,10 +41,19 @@ export default function TripDetail() {
   const [rateLoading, setRateLoading] = useState(false);
 
   const flightCurrencies = Array.from(new Set((trip?.plan?.flights ?? []).map((f) => f.currency))).filter(Boolean);
+  const accommodationCurrencies = Array.from(
+    new Set(
+      (trip?.plan?.accommodations ?? [])
+        .filter((a) => a.source === "real")
+        .map((a) => a.currency as string | undefined)
+        .filter((c): c is string => Boolean(c))
+    )
+  );
+  const offerCurrencies = Array.from(new Set([...flightCurrencies, ...accommodationCurrencies]));
 
   useEffect(() => {
-    if (!displayCurrency || flightCurrencies.length === 0) return;
-    const missing = flightCurrencies.filter((c) => c !== displayCurrency && !(`${c}->${displayCurrency}` in rateCache));
+    if (!displayCurrency || offerCurrencies.length === 0) return;
+    const missing = offerCurrencies.filter((c) => c !== displayCurrency && !(`${c}->${displayCurrency}` in rateCache));
     if (missing.length === 0) return;
     setRateLoading(true);
     Promise.all(
@@ -64,7 +73,7 @@ export default function TripDetail() {
       })
       .finally(() => setRateLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [displayCurrency, flightCurrencies.join(",")]);
+  }, [displayCurrency, offerCurrencies.join(",")]);
 
   function convertedPrice(amount: number | null, fromCurrency: string): { amount: number; currency: string } | null {
     if (amount == null) return null;
@@ -553,9 +562,38 @@ export default function TripDetail() {
                 Selecting an accommodation recomputes only the Itinerary tab's day-by-day schedule
                 (it depends on where you're staying) — flights, research, and dining aren't touched.
               </p>
+              {accommodationCurrencies.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-3">
+                  <label className="flex items-center gap-2 text-xs font-medium text-ink-600">
+                    Show prices in
+                    <select
+                      value={displayCurrency}
+                      onChange={(e) => setDisplayCurrency(e.target.value)}
+                      className="rounded-lg border border-ink-900/10 px-2 py-1 text-xs"
+                    >
+                      <option value="">Original ({accommodationCurrencies.join(", ")})</option>
+                      {["USD", "EUR", "GBP", "INR", "JPY", "AUD", "CAD", "SGD"]
+                        .filter((c) => !accommodationCurrencies.includes(c))
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  {rateLoading && <span className="text-xs text-ink-400">Fetching live rate…</span>}
+                  {displayCurrency && !rateLoading && (
+                    <span className="text-xs text-ink-400">Converted at live exchange rates — never estimated.</span>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {trip.plan.accommodations.map((a, i) => {
                   const isSelected = trip.selected_accommodation_index === i;
+                  const converted =
+                    a.source === "real" && a.currency
+                      ? convertedPrice(a.price_raw ?? null, a.currency)
+                      : null;
                   return (
                     <div
                       key={i}
@@ -588,6 +626,16 @@ export default function TripDetail() {
                           )}
                         </div>
                       </div>
+                      {converted && (
+                        <p className="text-sm font-medium text-ink-700">
+                          {converted.currency} {converted.amount} / night
+                          {displayCurrency && displayCurrency !== a.currency && (
+                            <span className="ml-1 text-xs font-normal text-ink-400">
+                              ({a.currency} {a.price_raw})
+                            </span>
+                          )}
+                        </p>
+                      )}
                       <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
                         {JSON.stringify(a, null, 2)}
                       </pre>

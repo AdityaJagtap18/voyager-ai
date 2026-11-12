@@ -577,9 +577,17 @@ prices (e.g. a USD flight offer shown in the user's own currency), not just a st
 distinct offer currency present (via the same `currency_api.py`/`/api/currency/convert` built above)
 and displays the converted total alongside the original, never replacing or hiding the real source
 price. No conversion happens until the user asks for one, and a missing/failed rate falls back to the
-original price rather than showing a wrong number. Not yet extended to Hotels or the Budget allocation
-card (both still show their original currency) - documented here as the next natural extension of this
-same mechanism, not built in this pass.
+original price rather than showing a wrong number.
+
+**Extended, same phase**: the same mechanism now also covers the Accommodations tab (real,
+provider-priced listings only - an LLM-suggested accommodation has no real `price_raw`/`currency` to
+convert, and correctly shows no price line or selector contribution) and the Budget & Expenses tab's
+"Estimated budget allocation" card (converted from INR, the currency every budget amount in this app
+is entered and stored in). Both share the same "real rate, graceful original-price fallback" behavior
+as the Flights tab. Live-verified with a throwaway trip seeded with a real-shaped USD accommodation
+price (USD 78/night → INR 7,307.82 at the live rate) and a ₹50,000 budget (→ USD 533.65 remaining,
+every category converted) - both deleted after verification. Hotels.tsx (the standalone hotel search
+page, separate from a trip's Accommodations tab) is not yet covered - same mechanism, not done here.
 
 ## AI-powered conversational trip assistant (Phase 11c)
 

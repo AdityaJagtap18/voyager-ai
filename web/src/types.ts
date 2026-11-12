@@ -100,6 +100,9 @@ export interface Restaurant {
 
 export interface Accommodation {
   name: string;
+  price_raw?: number | null;
+  currency?: string;
+  source?: "real" | "llm";
   [key: string]: unknown;
 }
 

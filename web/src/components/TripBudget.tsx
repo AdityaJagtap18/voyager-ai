@@ -43,6 +43,29 @@ export default function TripBudget({
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [currentBudget, setCurrentBudget] = useState(budgetAmount);
+  const [displayCurrency, setDisplayCurrency] = useState("");
+  const [rate, setRate] = useState<number | null>(null);
+  const [rateLoading, setRateLoading] = useState(false);
+
+  useEffect(() => {
+    if (!displayCurrency || displayCurrency === "INR") {
+      setRate(null);
+      return;
+    }
+    setRateLoading(true);
+    api
+      .convertCurrency(1, "INR", displayCurrency)
+      .then((r) => setRate(r.rate))
+      .catch(() => setRate(null))
+      .finally(() => setRateLoading(false));
+  }, [displayCurrency]);
+
+  function formatAllocationAmount(amount: number): string {
+    if (displayCurrency && displayCurrency !== "INR" && rate != null) {
+      return `${displayCurrency} ${Math.round(amount * rate * 100) / 100}`;
+    }
+    return `₹${amount.toLocaleString()}`;
+  }
 
   function refresh() {
     Promise.all([api.listExpenses(tripId), api.listBookings(tripId)])
@@ -157,11 +180,29 @@ export default function TripBudget({
 
       {budgetAllocation && (
         <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Estimated budget allocation</p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Estimated budget allocation</p>
+            <label className="flex items-center gap-2 text-xs font-medium text-ink-600">
+              Show in
+              <select
+                value={displayCurrency}
+                onChange={(e) => setDisplayCurrency(e.target.value)}
+                className="rounded-lg border border-ink-900/10 px-2 py-1 text-xs"
+              >
+                <option value="">Original (INR)</option>
+                {["USD", "EUR", "GBP", "JPY", "AUD", "CAD", "SGD"].map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
           <p className="mt-1 text-xs text-ink-500">
-            A deterministic split of what's left (₹{budgetAllocation.remaining_after_committed.toLocaleString()}) after
-            committed spend, based on the "{budgetAllocation.budget_level}" level — a planning guide, not a forecast
-            of actual spend.
+            A deterministic split of what's left ({formatAllocationAmount(budgetAllocation.remaining_after_committed)})
+            after committed spend, based on the "{budgetAllocation.budget_level}" level — a planning guide, not a
+            forecast of actual spend.
+            {rateLoading && " Fetching live rate…"}
           </p>
           <div className="mt-3 flex flex-col gap-2">
             {Object.entries(budgetAllocation.allocation).map(([cat, amount]) => {
@@ -174,7 +215,7 @@ export default function TripBudget({
                   <div className="h-2 flex-1 overflow-hidden rounded-full bg-ink-100">
                     <div className="h-full rounded-full bg-brand-400" style={{ width: `${pctOfRemaining}%` }} />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs text-ink-500">₹{amount.toLocaleString()}</span>
+                  <span className="w-24 shrink-0 text-right text-xs text-ink-500">{formatAllocationAmount(amount)}</span>
                   {budgetAllocation.capped_categories.includes(cat) && (
                     <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
                       capped
