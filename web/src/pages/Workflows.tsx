@@ -5,9 +5,26 @@ import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
 import type { TraceEntry, TripDetail, TripSummary, WorkflowsResponse } from "../types";
 
-function statusBadge(entry: TraceEntry | undefined) {
+/**
+ * "success" in the trace only means the step ran without raising an
+ * exception - for flights/transportation it does NOT mean a real offer/route
+ * was actually found (flights_api.search_flights_for_trip returning None,
+ * or find_airport_transfer returning None, both still record "success").
+ * foundReal lets the caller say, for the steps where that distinction
+ * matters, whether the step's own real data actually came back - otherwise
+ * "ran" reads as "found something" when the trip's own Flights/Transportation
+ * tab may say "No real data" right next to it.
+ */
+function statusBadge(entry: TraceEntry | undefined, foundReal: boolean | null) {
   if (!entry) return null;
   if (entry.status === "success") {
+    if (foundReal === false) {
+      return (
+        <span className="rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-600">
+          ran · nothing real found · {entry.duration_ms.toFixed(0)} ms
+        </span>
+      );
+    }
     return (
       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
         ran · {entry.duration_ms.toFixed(0)} ms
@@ -57,6 +74,16 @@ export default function Workflows() {
     // different id, so it never collides with the original plan's "flights").
     const matches = detail.trace.filter((t) => t.step === stepId);
     return matches[matches.length - 1];
+  }
+
+  // Cross-checks the trip's actual plan data, since a "success" trace entry
+  // for these two steps only means "ran without raising" - not "found real
+  // data" (see statusBadge's comment). null = not applicable for this step.
+  function foundRealFor(stepId: string): boolean | null {
+    if (!detail) return null;
+    if (stepId === "flights") return (detail.plan?.flights?.length ?? 0) > 0;
+    if (stepId === "transportation") return detail.plan?.transportation != null;
+    return null;
   }
 
   return (
@@ -127,6 +154,7 @@ export default function Workflows() {
           <div className="flex flex-col items-stretch gap-0">
             {workflow.steps.map((step, i) => {
               const entry = traceFor(step.id);
+              const foundReal = foundRealFor(step.id);
               return (
                 <div key={step.id} className="flex flex-col items-center">
                   <div className="w-full max-w-xl rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
@@ -145,7 +173,7 @@ export default function Workflows() {
                             {step.always_runs ? "Always runs" : "Conditional"}
                           </span>
                         )}
-                        {statusBadge(entry)}
+                        {statusBadge(entry, foundReal)}
                       </div>
                     </div>
                     <p className="text-sm text-ink-500">{step.description}</p>
