@@ -121,6 +121,14 @@ class TravelBudgetCapsUpdate(BaseModel):
     max_transport_budget_amount: Optional[float] = Field(None, ge=0)
 
 
+class TripAssistantRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+
+
+class TripAssistantResponse(BaseModel):
+    answer: str
+
+
 class BookingCreateRequest(BaseModel):
     type: str
     title: str = Field(..., min_length=1, max_length=255)

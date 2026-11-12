@@ -211,6 +211,12 @@ export const api = {
   currencyRates: (base: string) =>
     request<CurrencyRates>(`/api/currency/rates?${new URLSearchParams({ base })}`),
 
+  askTripAssistant: (tripId: string, message: string) =>
+    request<{ answer: string }>(`/api/trips/${tripId}/assistant`, {
+      method: "POST",
+      body: JSON.stringify({ message }),
+    }),
+
   mapsSearch: (query: string) =>
     request<MapPlace[]>(`/api/maps/search?${new URLSearchParams({ query })}`),
   mapsRoute: (origin: MapPlace, destination: MapPlace) =>

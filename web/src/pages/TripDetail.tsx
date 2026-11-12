@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Spinner from "../components/Spinner";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
+import TripAssistant from "../components/TripAssistant";
 import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
 import TripDocuments from "../components/TripDocuments";
@@ -24,7 +25,8 @@ type Tab =
   | "bookings"
   | "budget"
   | "documents"
-  | "share";
+  | "share"
+  | "assistant";
 
 export default function TripDetail() {
   const { id } = useParams<{ id: string }>();
@@ -34,6 +36,43 @@ export default function TripDetail() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
+  const [displayCurrency, setDisplayCurrency] = useState<string>("");
+  const [rateCache, setRateCache] = useState<Record<string, number>>({});
+  const [rateLoading, setRateLoading] = useState(false);
+
+  const flightCurrencies = Array.from(new Set((trip?.plan?.flights ?? []).map((f) => f.currency))).filter(Boolean);
+
+  useEffect(() => {
+    if (!displayCurrency || flightCurrencies.length === 0) return;
+    const missing = flightCurrencies.filter((c) => c !== displayCurrency && !(`${c}->${displayCurrency}` in rateCache));
+    if (missing.length === 0) return;
+    setRateLoading(true);
+    Promise.all(
+      missing.map((c) =>
+        api
+          .convertCurrency(1, c, displayCurrency)
+          .then((r) => [`${c}->${displayCurrency}`, r.rate] as const)
+          .catch(() => null)
+      )
+    )
+      .then((results) => {
+        setRateCache((prev) => {
+          const next = { ...prev };
+          for (const r of results) if (r) next[r[0]] = r[1];
+          return next;
+        });
+      })
+      .finally(() => setRateLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayCurrency, flightCurrencies.join(",")]);
+
+  function convertedPrice(amount: number | null, fromCurrency: string): { amount: number; currency: string } | null {
+    if (amount == null) return null;
+    if (!displayCurrency || fromCurrency === displayCurrency) return { amount, currency: fromCurrency };
+    const rate = rateCache[`${fromCurrency}->${displayCurrency}`];
+    if (rate == null) return null;
+    return { amount: Math.round(amount * rate * 100) / 100, currency: displayCurrency };
+  }
 
   function formatDateTime(iso: string | null): string {
     if (!iso) return "N/A";
@@ -152,8 +191,9 @@ export default function TripDetail() {
                   "budget",
                   "documents",
                   "share",
+                  "assistant",
                 ] as Tab[])
-              : (["bookings", "budget", "documents", "share"] as Tab[])
+              : (["bookings", "budget", "documents", "share", "assistant"] as Tab[])
             ).map((t) => (
               <button
                 key={t}
@@ -162,7 +202,13 @@ export default function TripDetail() {
                   tab === t ? "border-brand-600 text-brand-700" : "border-transparent text-ink-500 hover:text-ink-900"
                 }`}
               >
-                {t === "bookings" ? "Bookings & Wallet" : t === "budget" ? "Budget & Expenses" : t}
+                {t === "bookings"
+                  ? "Bookings & Wallet"
+                  : t === "budget"
+                  ? "Budget & Expenses"
+                  : t === "assistant"
+                  ? "Ask Voyager"
+                  : t}
               </button>
             ))}
             </div>
@@ -183,6 +229,7 @@ export default function TripDetail() {
           )}
           {tab === "documents" && <TripDocuments tripId={trip.id} />}
           {tab === "share" && <TripShare tripId={trip.id} initialToken={trip.share_token} />}
+          {tab === "assistant" && <TripAssistant tripId={trip.id} />}
 
           {tab === "itinerary" && trip.plan && (
             <div className="flex flex-col gap-4">
@@ -242,6 +289,31 @@ export default function TripDetail() {
                     ? "The live flight search found no offers, or the provider errored — nothing was invented to fill the gap."
                     : "Add a departure city and start date to a new trip to ground it in a real flight search."}
                 </p>
+              )}
+              {flightCurrencies.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 rounded-xl2 border border-ink-900/5 bg-white shadow-card p-3">
+                  <label className="flex items-center gap-2 text-xs font-medium text-ink-600">
+                    Show prices in
+                    <select
+                      value={displayCurrency}
+                      onChange={(e) => setDisplayCurrency(e.target.value)}
+                      className="rounded-lg border border-ink-900/10 px-2 py-1 text-xs"
+                    >
+                      <option value="">Original ({flightCurrencies.join(", ")})</option>
+                      {["USD", "EUR", "GBP", "INR", "JPY", "AUD", "CAD", "SGD"]
+                        .filter((c) => !flightCurrencies.includes(c))
+                        .map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  {rateLoading && <span className="text-xs text-ink-400">Fetching live rate…</span>}
+                  {displayCurrency && !rateLoading && (
+                    <span className="text-xs text-ink-400">Converted at live exchange rates — never estimated.</span>
+                  )}
+                </div>
               )}
               {trip.flight_recommendations && (
                 <div className="rounded-xl2 border border-brand-100 bg-brand-50/60 p-3 text-xs text-ink-700">
@@ -328,12 +400,27 @@ export default function TripDetail() {
                       </div>
                     </div>
                     <p className="text-sm text-ink-700">
-                      {f.price ?? "Price unavailable"} · {f.stops === 0 ? "Nonstop" : `${f.stops} stop(s)`}
+                      {(() => {
+                        const converted = convertedPrice(f.price_raw, f.currency);
+                        if (converted) return `${converted.currency} ${converted.amount}`;
+                        return f.price ?? "Price unavailable";
+                      })()}
+                      {displayCurrency && displayCurrency !== f.currency && (
+                        <span className="ml-1 text-xs text-ink-400">({f.price ?? `${f.currency} ${f.price_raw}`})</span>
+                      )}
+                      {" · "}
+                      {f.stops === 0 ? "Nonstop" : `${f.stops} stop(s)`}
                       {f.duration_minutes != null && ` · ${Math.round(f.duration_minutes / 60)}h ${f.duration_minutes % 60}m`}
                     </p>
                     {scored?.total_price != null && recs && recs.traveler_count > 1 && (
                       <p className="text-xs text-ink-500">
-                        {f.currency} {scored.total_price} total for {recs.traveler_count} travelers
+                        {(() => {
+                          const converted = convertedPrice(scored.total_price, f.currency);
+                          return converted
+                            ? `${converted.currency} ${converted.amount}`
+                            : `${f.currency} ${scored.total_price}`;
+                        })()}{" "}
+                        total for {recs.traveler_count} travelers
                       </p>
                     )}
                     <p className="mt-1 text-xs text-ink-500">

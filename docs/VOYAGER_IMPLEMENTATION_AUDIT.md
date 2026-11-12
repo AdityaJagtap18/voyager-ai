@@ -571,7 +571,40 @@ currencies, with a swap button and the live rate/date shown alongside the result
 unit + 4 API-level); live-verified in the browser at desktop and mobile widths against the real
 Frankfurter API (100 USD → 9,369 INR at the live rate of 93.69, correctly dated).
 
-Not built: automatic conversion of flight/hotel offer prices shown elsewhere in the app (those stay
-in their original, real provider currency, as before) - this is a standalone conversion tool, not yet
-wired into the Flights/Budget tabs. Multi-currency budget tracking (e.g. a budget set in one currency
-automatically reconciled against expenses logged in another) is also not built.
+**Follow-up, same phase**: the user clarified the actual want was inline conversion of recommendation
+prices (e.g. a USD flight offer shown in the user's own currency), not just a standalone tool. Added a
+"Show prices in" selector to the Flights tab: picking a currency fetches the real rate for each
+distinct offer currency present (via the same `currency_api.py`/`/api/currency/convert` built above)
+and displays the converted total alongside the original, never replacing or hiding the real source
+price. No conversion happens until the user asks for one, and a missing/failed rate falls back to the
+original price rather than showing a wrong number. Not yet extended to Hotels or the Budget allocation
+card (both still show their original currency) - documented here as the next natural extension of this
+same mechanism, not built in this pass.
+
+## AI-powered conversational trip assistant (Phase 11c)
+
+A single-turn Q&A layer over one trip's real data, satisfying the original spec's "AI-powered
+conversational interaction over real data" requirement with the same discipline used everywhere else
+in Phase 11: the LLM explains, it never computes or invents a number. `app/agents/trip_assistant_agent.py`
+sends the model a system prompt that embeds a JSON snapshot of the trip's real data (destination,
+budget_allocation, flight_recommendations, transport_recommendations, itinerary days, attraction/
+restaurant/accommodation names) and instructs it to answer only from that snapshot, saying so plainly
+rather than guessing when the data needed isn't present - verified live (the Jaipur trip's "How is my
+budget allocated?" correctly got "The budget allocation is not provided in the TRIP_DATA" rather than
+a fabricated number, since that trip has no budget set).
+
+**API**: `POST /api/trips/{trip_id}/assistant` - runs the message through the existing guardrails
+scanner first (`_run_guardrail_scan`, same as trip-destination and knowledge-ingestion text), 503s if
+no model is configured, then grounds the answer in `_build_trip_assistant_context()`. 8 new tests (3
+unit tests for the agent with a mocked LLM, 5 API-level tests covering grounding, 404, 503, and two
+guardrail-rejection paths).
+
+**Frontend**: a new "Ask Voyager" tab on Trip Detail (`TripAssistant.tsx`) - three suggested starter
+questions, a chat-style message list, and a disclosure that answers are grounded only in real computed
+data. Live-verified: asked "How many days is this trip and what destination is it?" against a real
+trip and got a correct, grounded answer back through the full stack (API → real OpenAI call → UI).
+
+**Explicitly out of scope**: persisted multi-turn conversation history (every question is answered
+fresh from the current trip snapshot, with no memory of earlier questions in the same session) - this
+was a deliberate scope cut to ship a working, honest single-turn slice rather than a half-built
+multi-turn chat; persisting conversation turns would need a new DB table and is a natural next step.

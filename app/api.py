@@ -14,7 +14,7 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -92,6 +92,8 @@ from app.schemas import (  # noqa: E402
     SelectIndexRequest,
     ShareLinkResponse,
     TravelBudgetCapsUpdate,
+    TripAssistantRequest,
+    TripAssistantResponse,
     TripBudgetUpdate,
     TripCreateRequest,
     TripDetail,
@@ -104,6 +106,7 @@ from agents.itinerary_agent import ItineraryAgent  # noqa: E402
 from services.budget_allocator import allocate_budget  # noqa: E402
 from services.flight_recommendations import recommend_flights  # noqa: E402
 from services.transport_recommendations import recommend_transport  # noqa: E402
+from agents.trip_assistant_agent import TripAssistantAgent  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -438,6 +441,80 @@ def update_budget_caps(trip_id: str, payload: TravelBudgetCapsUpdate, db: Sessio
     db.refresh(trip)
     _attach_derived_recommendations(trip, db)
     return trip
+
+
+def _build_trip_assistant_context(trip: Trip) -> Dict[str, Any]:
+    """A trimmed, real-data-only snapshot of the trip for the assistant to
+    answer from - every field here is either a DB column or one of the
+    already-computed derived fields (_attach_derived_recommendations must be
+    called first), never something synthesized just for the chat."""
+    plan = trip.plan or {}
+    itinerary = plan.get("itinerary") or {}
+    return {
+        "destination": trip.destination,
+        "days": trip.days,
+        "trip_type": trip.trip_type,
+        "budget_level": trip.budget,
+        "budget_amount": trip.budget_amount,
+        "traveler_count": trip.traveler_count,
+        "start_date": trip.start_date,
+        "origin": trip.origin,
+        "selected_flight_index": trip.selected_flight_index,
+        "selected_accommodation_index": trip.selected_accommodation_index,
+        "budget_allocation": trip.budget_allocation,
+        "flight_recommendations": trip.flight_recommendations,
+        "transport_recommendations": trip.transport_recommendations,
+        "itinerary_summary": itinerary.get("summary"),
+        "itinerary_days": [
+            {
+                "day": day.get("day"),
+                "theme": day.get("theme"),
+                "activities": [
+                    {"time": a.get("time"), "name": a.get("name"), "type": a.get("type")}
+                    for a in day.get("activities", [])
+                ],
+                "warnings": day.get("warnings"),
+            }
+            for day in itinerary.get("itinerary", [])
+        ],
+        "attractions": [a.get("name") for a in plan.get("attractions", [])],
+        "restaurants": [r.get("name") for r in plan.get("restaurants", [])],
+        "accommodations": [
+            {"name": a.get("name"), "price_raw": a.get("price_raw"), "source": a.get("source")}
+            for a in plan.get("accommodations", [])
+        ],
+    }
+
+
+@app.post("/api/trips/{trip_id}/assistant", response_model=TripAssistantResponse)
+def ask_trip_assistant(trip_id: str, payload: TripAssistantRequest, db: Session = Depends(get_db)):
+    """AI-powered conversational interaction over real trip data (Phase 11c).
+    Single-turn: answers one question, grounded in a snapshot of this trip's
+    real, already-computed data - the model is instructed to never invent a
+    number not present in that snapshot. No conversation history is
+    persisted across calls."""
+    trip = _get_trip_or_404(trip_id, db)
+
+    scan = _run_guardrail_scan(payload.message, "trip_assistant", db)
+    if scan["blocked"]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Message rejected by the guardrails scanner (risk: {scan['risk']}, categories: {scan['categories']})",
+        )
+
+    model_id = resolve_model(trip.model)
+    if not is_configured(model_id):
+        info = MODEL_REGISTRY[model_id]
+        raise HTTPException(
+            status_code=503,
+            detail=f"Model '{model_id}' needs {info.requires_env} to be set on the server; it isn't configured",
+        )
+
+    _attach_derived_recommendations(trip, db)
+    context = _build_trip_assistant_context(trip)
+    agent = TripAssistantAgent(model=model_id)
+    answer = agent.answer(payload.message, context)
+    return TripAssistantResponse(answer=answer)
 
 
 # --- Per-section selection (Phase 10) ---------------------------------------------
