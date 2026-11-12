@@ -137,6 +137,7 @@ export interface DayActivity {
   meal_type?: string;
   cuisine?: string;
   price_range?: string;
+  coordinates?: { lat: number; lng: number } | null;
 }
 
 export interface DayPlan {

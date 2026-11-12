@@ -7,6 +7,7 @@ import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
 import TripDocuments from "../components/TripDocuments";
 import TripShare from "../components/TripShare";
+import DayMap from "../components/DayMap";
 import type { TripDetail as TripDetailType, RecommendationTag, TransportMode, AccommodationRecommendationTag } from "../types";
 
 const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
@@ -35,6 +36,7 @@ export default function TripDetail() {
   const [trip, setTrip] = useState<TripDetailType | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(requestedTab ?? "itinerary");
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [selectingIndex, setSelectingIndex] = useState<number | null>(null);
   const [refreshingRealData, setRefreshingRealData] = useState(false);
   const [refreshResult, setRefreshResult] = useState<string | null>(null);
@@ -281,54 +283,88 @@ export default function TripDetail() {
           {tab === "share" && <TripShare tripId={trip.id} initialToken={trip.share_token} />}
           {tab === "assistant" && <TripAssistant tripId={trip.id} />}
 
-          {tab === "itinerary" && trip.plan && (
-            <div className="flex flex-col gap-4">
-              {trip.plan.itinerary?.itinerary?.map((day) => (
-                <div key={day.day} className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5">
-                  <h3 className="font-semibold">
-                    Day {day.day} — {day.theme}
-                  </h3>
-                  {day.warnings && day.warnings.length > 0 && (
-                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
-                      {day.warnings.map((w, i) => (
-                        <p key={i}>{w}</p>
-                      ))}
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {day.activities.map((activity, i) => (
-                      <div key={i} className="flex gap-3 border-t border-ink-900/5 pt-2 first:border-t-0 first:pt-0">
-                        <span className="w-16 shrink-0 text-xs font-medium text-ink-500">{activity.time}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <p className="text-sm font-medium">{activity.name}</p>
-                            {activity.scheduling_status === "conflict" && (
-                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
-                                Scheduling conflict
-                              </span>
-                            )}
-                            {activity.time_source === "estimated" && (
-                              <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-500">
-                                Estimated time
-                              </span>
-                            )}
-                          </div>
-                          {activity.description && <p className="text-xs text-ink-500">{activity.description}</p>}
-                          <p className="mt-0.5 text-xs text-ink-400">
-                            {activity.duration && <>{activity.duration}</>}
-                            {!!activity.travel_time_before_minutes && (
-                              <> · {activity.travel_time_before_minutes} min travel before this</>
-                            )}
-                          </p>
-                        </div>
-                      </div>
+          {tab === "itinerary" && trip.plan && (() => {
+            const days = trip.plan.itinerary?.itinerary ?? [];
+            const activeDay = days.find((d) => d.day === selectedDay) ?? days[0];
+            return (
+              <div className="flex flex-col gap-4">
+                {days.length > 1 && (
+                  <div className="flex flex-wrap gap-2">
+                    {days.map((day) => (
+                      <button
+                        key={day.day}
+                        onClick={() => setSelectedDay(day.day)}
+                        className={`rounded-xl2 border px-4 py-2 text-left text-xs font-medium ${
+                          (activeDay?.day ?? days[0]?.day) === day.day
+                            ? "border-brand-500 bg-brand-50 text-brand-700"
+                            : "border-ink-900/10 bg-white text-ink-600 hover:bg-ink-50"
+                        }`}
+                      >
+                        Day {day.day}
+                      </button>
                     ))}
-                    {day.activities.length === 0 && <p className="text-sm text-ink-500">No activities scheduled.</p>}
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                )}
+                {activeDay && (
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+                    <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-5 lg:col-span-3">
+                      <h3 className="font-semibold">
+                        Day {activeDay.day} — {activeDay.theme}
+                      </h3>
+                      {activeDay.warnings && activeDay.warnings.length > 0 && (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+                          {activeDay.warnings.map((w, i) => (
+                            <p key={i}>{w}</p>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-3 flex flex-col gap-2">
+                        {activeDay.activities.map((activity, i) => (
+                          <div key={i} className="flex gap-3 border-t border-ink-900/5 pt-2 first:border-t-0 first:pt-0">
+                            <span className="w-16 shrink-0 text-xs font-medium text-ink-500">{activity.time}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="text-sm font-medium">{activity.name}</p>
+                                {activity.scheduling_status === "conflict" && (
+                                  <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+                                    Scheduling conflict
+                                  </span>
+                                )}
+                                {activity.time_source === "estimated" && (
+                                  <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[10px] font-medium text-ink-500">
+                                    Estimated time
+                                  </span>
+                                )}
+                              </div>
+                              {activity.description && <p className="text-xs text-ink-500">{activity.description}</p>}
+                              <p className="mt-0.5 text-xs text-ink-400">
+                                {activity.duration && <>{activity.duration}</>}
+                                {!!activity.travel_time_before_minutes && (
+                                  <> · {activity.travel_time_before_minutes} min travel before this</>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                        {activeDay.activities.length === 0 && (
+                          <p className="text-sm text-ink-500">No activities scheduled.</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 lg:col-span-2">
+                      <p className="mb-2 text-xs font-semibold text-ink-600">Day {activeDay.day} route</p>
+                      <DayMap activities={activeDay.activities} />
+                    </div>
+                  </div>
+                )}
+                {days.length === 0 && (
+                  <p className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 text-sm text-ink-500">
+                    No itinerary generated for this trip.
+                  </p>
+                )}
+              </div>
+            );
+          })()}
 
           {tab === "flights" && trip.plan && (
             <div className="flex flex-col gap-3">

@@ -582,7 +582,8 @@ class ItineraryAgent:
                         "time_source": item.get('time_source', 'unscheduled'),
                         "booking_status": "not_booked",
                         "scheduling_status": item.get('scheduling_status', 'ok'),
-                        "description": f"{item.get('meal_type_scheduled', 'Meal').title()} at {item['name']}"
+                        "description": f"{item.get('meal_type_scheduled', 'Meal').title()} at {item['name']}",
+                        "coordinates": item.get('coordinates'),
                     }
 
                     if item.get('distance_from_current'):
@@ -617,7 +618,8 @@ class ItineraryAgent:
                         "scheduling_status": item.get('scheduling_status', 'ok'),
                         "category": item.get("category", "activity"),
                         "description": item.get("description", ""),
-                        "notes": f"Best time: {item.get('best_time', 'anytime')}"
+                        "notes": f"Best time: {item.get('best_time', 'anytime')}",
+                        "coordinates": item.get('coordinates'),
                     }
                     
                     if item.get('travel_to_next'):
