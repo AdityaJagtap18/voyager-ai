@@ -797,9 +797,7 @@ flights-sky lookup never touches the fallback at all), and only logs a "no offer
 provider" warning once both have been tried. 24 tests across `tests/test_flights_api.py` and the new
 `tests/test_sky_scrapper_api.py`, plus the full 334-test suite, all pass.
 
-**Not yet live-verified against the real Sky Scrapper API**: the field names in
-`_search_flights()`/`search_airport()` are based on the listing's documented endpoints and response
-shape (third-party-documented, not an official spec), so the exact JSON shape should be re-checked
-against a real response once a key is subscribed - if RapidAPI's actual payload differs, parsing will
-simply find nothing and return `None` (consistent with the anti-fabrication contract) rather than throw
-or fabricate, but the fallback won't surface real offers until that's confirmed.
+**Live-verified** once the user subscribed to Sky Scrapper's free Basic plan: `search_flights_for_trip
+("Mumbai", "Goa", "2026-12-10")` returned 5 real offers straight away (Air India Express and IndiGo,
+$48-$76, correct airport codes/times) with no parsing changes needed - the field names assumed from
+the listing's third-party docs matched the real payload exactly.
