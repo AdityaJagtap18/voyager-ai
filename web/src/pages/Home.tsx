@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import TripCard from "../components/TripCard";
@@ -94,7 +95,7 @@ export default function Home() {
           </Link>
         </div>
 
-        {loading && <p className="text-sm text-ink-500">Loading…</p>}
+        {loading && <Spinner />}
         {error && (
           <p className="text-sm text-rose-600">
             Couldn&apos;t reach the Voyager API at the configured URL ({error}). Is the backend running
@@ -102,7 +103,18 @@ export default function Home() {
           </p>
         )}
         {!loading && !error && trips.length === 0 && (
-          <p className="text-sm text-ink-500">No trips yet — plan your first one.</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl2 border border-dashed border-ink-900/15 bg-white/60 py-10 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-brand-50">
+              <img src="/icons/Travel/itinerary.svg" alt="" className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <p className="text-sm text-ink-500">No trips yet — plan your first one.</p>
+            <Link
+              to="/plan"
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0"
+            >
+              Plan a Trip
+            </Link>
+          </div>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

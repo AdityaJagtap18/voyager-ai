@@ -103,7 +103,7 @@ export default function Hotels() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 sm:w-auto"
+          className="w-full rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0 disabled:opacity-50 sm:w-auto"
         >
           {loading ? "Searching…" : "Search hotels"}
         </button>

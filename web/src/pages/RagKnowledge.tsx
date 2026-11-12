@@ -106,7 +106,7 @@ export default function RagKnowledge() {
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0 disabled:opacity-50"
           >
             {submitting ? "Embedding…" : "Add note"}
           </button>

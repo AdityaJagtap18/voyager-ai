@@ -201,7 +201,7 @@ export default function PlanTrip() {
           <button
             type="submit"
             disabled={submitting}
-            className="flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0 disabled:opacity-50"
           >
             <img src="/icons/Travel/flights.svg" alt="" className="h-4 w-4 invert" aria-hidden="true" />
             {submitting ? "Planning your trip… this can take a minute" : "Generate Itinerary"}

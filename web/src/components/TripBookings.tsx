@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import Spinner from "./Spinner";
 import { api } from "../api/client";
 import { BOOKING_TYPES, type Booking } from "../types";
 
@@ -78,12 +79,12 @@ export default function TripBookings({ tripId }: { tripId: string }) {
             className="w-28 rounded-lg border border-ink-900/10 px-2 py-1.5 text-sm"
           />
         </label>
-        <button type="submit" className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-brand-700">
+        <button type="submit" className="rounded-lg bg-brand-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0">
           Add
         </button>
       </form>
 
-      {loading && <p className="text-sm text-ink-500">Loading…</p>}
+      {loading && <Spinner />}
       {!loading && bookings.length === 0 && <p className="text-sm text-ink-500">No bookings recorded yet.</p>}
 
       <div className="flex flex-col gap-3">

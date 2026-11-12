@@ -68,7 +68,7 @@ export default function SecurityLab() {
         <button
           type="submit"
           disabled={scanning}
-          className="self-start rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          className="self-start rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0 disabled:opacity-50"
         >
           {scanning ? "Scanning…" : "Scan"}
         </button>

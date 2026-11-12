@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
@@ -110,7 +111,7 @@ export default function Observability() {
 
           <div>
             {detailError && <p className="text-sm text-rose-600">{detailError}</p>}
-            {!detail && !detailError && <p className="text-sm text-ink-500">Loading…</p>}
+            {!detail && !detailError && <Spinner />}
             {detail && (
               <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-6">
                 <div className="mb-4 flex items-center justify-between">

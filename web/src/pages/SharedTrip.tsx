@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { useParams } from "react-router-dom";
 import { api, ApiError } from "../api/client";
 import type { PublicTripView } from "../types";
@@ -21,7 +22,7 @@ export default function SharedTrip() {
       <p className="mb-6 text-xs font-semibold uppercase tracking-wide text-ink-500">Shared trip · read-only</p>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      {!trip && !error && <p className="text-sm text-ink-500">Loading…</p>}
+      {!trip && !error && <Spinner />}
 
       {trip && (
         <div>

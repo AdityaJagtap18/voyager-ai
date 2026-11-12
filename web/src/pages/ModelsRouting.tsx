@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
 import type { ModelInfo } from "../types";
@@ -30,7 +31,7 @@ export default function ModelsRouting() {
       />
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      {!models && !error && <p className="text-sm text-ink-500">Loading…</p>}
+      {!models && !error && <Spinner />}
 
       {models && (
         <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">

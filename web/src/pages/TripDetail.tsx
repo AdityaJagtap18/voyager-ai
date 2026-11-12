@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api } from "../api/client";
 import TripBookings from "../components/TripBookings";
@@ -75,7 +76,7 @@ export default function TripDetail() {
   }
 
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
-  if (!trip) return <p className="text-sm text-ink-500">Loading…</p>;
+  if (!trip) return <Spinner />;
 
   return (
     <div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
@@ -32,7 +33,7 @@ export default function TripPickerHub({
     <div>
       <PageHeader icon={icon} title={title} description={description} />
 
-      {loading && <p className="text-sm text-ink-500">Loading…</p>}
+      {loading && <Spinner />}
       {!loading && trips.length === 0 && (
         <p className="text-sm text-ink-500">
           No trips yet. <Link to="/plan" className="text-brand-600 hover:underline">Plan one first</Link>, then come back here.

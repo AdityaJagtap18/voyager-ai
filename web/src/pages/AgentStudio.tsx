@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
 import type { AgentInfo, FrameworkInfo } from "../types";
@@ -28,7 +29,7 @@ export default function AgentStudio() {
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Orchestration Frameworks</h2>
-      {!frameworks && !error && <p className="mb-6 text-sm text-ink-500">Loading…</p>}
+      {!frameworks && !error && <Spinner />}
       {frameworks && (
         <div className="mb-8 grid gap-3 sm:grid-cols-2">
           {frameworks.map((f) => (
@@ -52,7 +53,7 @@ export default function AgentStudio() {
       )}
 
       <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink-500">Agent Roster</h2>
-      {!agents && !error && <p className="text-sm text-ink-500">Loading…</p>}
+      {!agents && !error && <Spinner />}
       {agents && (
         <div className="overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card">
           <table className="w-full text-left text-sm">

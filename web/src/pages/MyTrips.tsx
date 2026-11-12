@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Spinner from "../components/Spinner";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import PageHeader from "../components/PageHeader";
@@ -84,7 +85,7 @@ export default function MyTrips() {
   return (
     <div>
       <PageHeader icon="Navigation/my-trips.svg" title="My Trips" />
-      {loading && <p className="text-sm text-ink-500">Loading…</p>}
+      {loading && <Spinner />}
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {!loading && !error && trips.length === 0 && (
         <p className="text-sm text-ink-500">

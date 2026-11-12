@@ -1,4 +1,5 @@
 import { ChangeEvent, useEffect, useState } from "react";
+import Spinner from "./Spinner";
 import { api, ApiError } from "../api/client";
 import type { TripDocumentSummary } from "../types";
 
@@ -46,14 +47,14 @@ export default function TripDocuments({ tripId }: { tripId: string }) {
           <p className="text-sm font-medium text-ink-900">Attach a document</p>
           <p className="text-xs text-ink-500">Tickets, vouchers, passport scans — up to 10MB.</p>
         </div>
-        <label className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+        <label className="cursor-pointer rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0">
           {uploading ? "Uploading…" : "Upload"}
           <input type="file" className="hidden" disabled={uploading} onChange={handleUpload} />
         </label>
       </div>
 
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      {loading && <p className="text-sm text-ink-500">Loading…</p>}
+      {loading && <Spinner />}
       {!loading && documents.length === 0 && <p className="text-sm text-ink-500">No documents attached yet.</p>}
 
       <div className="flex flex-col gap-2">

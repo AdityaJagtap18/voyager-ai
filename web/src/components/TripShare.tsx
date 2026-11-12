@@ -54,7 +54,7 @@ export default function TripShare({ tripId, initialToken }: { tripId: string; in
         <button
           onClick={handleCreate}
           disabled={busy}
-          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-transform hover:-translate-y-0.5 hover:bg-brand-700 active:translate-y-0 disabled:opacity-50"
         >
           {busy ? "Creating…" : "Create share link"}
         </button>
