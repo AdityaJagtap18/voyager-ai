@@ -124,8 +124,6 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Voyager AI API", version="0.2.0", lifespan=lifespan)
 
-configure_observability(app=app, engine=engine)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
@@ -133,6 +131,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Instrumenting before all middleware is registered breaks the ASGI chain -
+# CORSMiddleware stops handling preflight OPTIONS requests correctly (they
+# 405 instead of getting CORS headers back) once FastAPIInstrumentor wraps
+# the app. Confirmed live: calling this after add_middleware fixes it.
+configure_observability(app=app, engine=engine)
 
 _workflows: Dict[str, MultiAgentWorkflow] = {}
 

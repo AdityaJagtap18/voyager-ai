@@ -31,7 +31,12 @@ import type {
   WorkflowsResponse,
 } from "../types";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+// 127.0.0.1, not localhost: on a machine where something else also publishes
+// port 8000 (e.g. an unrelated Docker container binding IPv6 [::], which
+// covers ::1), the browser can resolve "localhost" to that other listener
+// instead of this app's own backend - confirmed live as a silent CORS
+// failure with no indication which process actually answered.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
 
 export class ApiError extends Error {
   status: number;

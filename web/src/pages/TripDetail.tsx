@@ -589,9 +589,16 @@ export default function TripDetail() {
                       </span>
                     )}
                   </div>
-                  <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
-                    {JSON.stringify(r, null, 2)}
-                  </pre>
+                  <p className="text-sm text-ink-600">
+                    {[r.cuisine, r.price_range].filter(Boolean).join(" · ")}
+                  </p>
+                  {r.location && <p className="mt-1 text-xs text-ink-500">{r.location}</p>}
+                  {r.description && <p className="mt-2 text-sm text-ink-700">{r.description}</p>}
+                  {r.reservation && (
+                    <p className="mt-2 text-xs font-medium text-ink-500">
+                      Reservation: <span className="font-normal capitalize">{r.reservation}</span>
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -710,7 +717,7 @@ export default function TripDetail() {
                       {accTags.length > 0 && accRecs && (
                         <p className="mb-2 text-xs text-ink-500">{accRecs.reasons[accTags[0]]}</p>
                       )}
-                      {converted && (
+                      {converted ? (
                         <p className="text-sm font-medium text-ink-700">
                           {converted.currency} {converted.amount} / night
                           {displayCurrency && displayCurrency !== a.currency && (
@@ -719,10 +726,29 @@ export default function TripDetail() {
                             </span>
                           )}
                         </p>
+                      ) : (
+                        a.price_per_night && (
+                          <p className="text-sm font-medium text-ink-700">{a.price_per_night} / night</p>
+                        )
                       )}
-                      <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
-                        {JSON.stringify(a, null, 2)}
-                      </pre>
+                      <p className="mt-1 text-xs text-ink-500">
+                        {[a.type, a.neighborhood || a.location, a.rating].filter(Boolean).join(" · ")}
+                      </p>
+                      {a.highlights && a.highlights.length > 0 && (
+                        <p className="mt-2 text-sm text-ink-700">{a.highlights.join(" · ")}</p>
+                      )}
+                      {a.amenities && a.amenities.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {a.amenities.map((amenity) => (
+                            <span
+                              key={amenity}
+                              className="rounded-full bg-ink-100 px-2 py-0.5 text-xs text-ink-600"
+                            >
+                              {amenity}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   );
                 })}

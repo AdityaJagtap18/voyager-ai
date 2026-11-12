@@ -95,13 +95,27 @@ export interface Attraction {
 
 export interface Restaurant {
   name: string;
+  cuisine?: string;
+  price_range?: string;
+  location?: string;
+  neighborhood?: string;
+  reservation?: string;
+  description?: string;
+  source?: "real" | "llm";
   [key: string]: unknown;
 }
 
 export interface Accommodation {
   name: string;
+  type?: string;
+  location?: string;
+  neighborhood?: string;
+  price_per_night?: string;
   price_raw?: number | null;
   currency?: string;
+  rating?: string;
+  amenities?: string[];
+  highlights?: string[];
   source?: "real" | "llm";
   [key: string]: unknown;
 }
