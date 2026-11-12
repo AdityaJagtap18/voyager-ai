@@ -11,6 +11,7 @@ from agents.itinerary_agent import ItineraryAgent
 from agents.dining_agent import DiningAgent
 from agents.accommodation_agent import AccommodationAgent
 from rag import get_context_for_destination
+from services.geocoding import geocode_attractions
 from utils.logger import logger
 
 
@@ -90,6 +91,10 @@ class MultiAgentWorkflow:
                 days=state["days"],
                 knowledge_context=state.get("knowledge_context")
             )
+            # Geocode now (not just at the final itinerary step) so the
+            # Accommodation and Dining steps that follow can actually score
+            # proximity to attractions instead of silently skipping it.
+            attractions = geocode_attractions(attractions, state["destination"])
             logger.info(f"Research complete: {len(attractions)} attractions found")
             trace_entry = _trace_entry("research", start, "success")
             return {"attractions": attractions, "current_step": "research_complete", "trace": state.get("trace", []) + [trace_entry]}

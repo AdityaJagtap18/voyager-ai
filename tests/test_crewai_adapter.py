@@ -66,6 +66,9 @@ def test_plan_trip_calls_all_four_agents_in_order_and_assembles_plan():
 
     with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
         "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
     ):
         result = orchestrator.plan_trip(
             destination="Mumbai, India", days=2, trip_type="historic", budget="mid-range", dietary_preferences=["vegetarian"]
@@ -93,6 +96,9 @@ def test_plan_trip_passes_start_date_through_to_accommodation_agent():
 
     with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
         "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
     ):
         orchestrator.plan_trip(
             destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10"
@@ -108,6 +114,9 @@ def test_plan_trip_collects_errors_without_crashing():
 
     with patch("orchestration.crewai_adapter.Crew", _FakeCrew), patch(
         "orchestration.crewai_adapter.get_context_for_destination", return_value=""
+    ), patch(
+        "orchestration.crewai_adapter.geocode_attractions",
+        side_effect=lambda attractions, destination: attractions,
     ):
         result = orchestrator.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 

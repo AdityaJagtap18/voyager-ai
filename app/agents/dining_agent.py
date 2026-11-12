@@ -9,6 +9,8 @@ import json
 from llm_gateway import get_chat_model
 from utils.logger import logger
 from services.ors_api import geocode, matrix_distances, ORSError
+from services import restaurants_api
+from services.restaurants_api import RestaurantsAPIError
 
 
 class DiningAgent:
@@ -43,17 +45,26 @@ class DiningAgent:
             List of restaurant recommendations with distances
         """
         logger.info(f"Finding restaurants in {destination}")
-        
+
         # Calculate restaurants needed
         num_restaurants = days * 2  # 2 main meals per day
-        
-        # Get initial restaurant recommendations from LLM
-        restaurants = self._get_restaurant_recommendations(
-            destination, trip_type, num_restaurants, dietary_preferences
-        )
-        
-        # Geocode restaurants
-        restaurants = self._geocode_restaurants(restaurants, destination)
+
+        # Real listings (dining fusion) only when there's no dietary
+        # constraint for them to miss — the real provider has no dietary
+        # filtering, while the LLM prompt below is explicitly dietary-aware,
+        # so a constrained request always goes through the LLM path instead.
+        restaurants = None
+        if not dietary_preferences:
+            restaurants = self._get_real_restaurants(destination, num_restaurants)
+
+        if restaurants is None:
+            # Get initial restaurant recommendations from LLM
+            restaurants = self._get_restaurant_recommendations(
+                destination, trip_type, num_restaurants, dietary_preferences
+            )
+
+            # Geocode restaurants
+            restaurants = self._geocode_restaurants(restaurants, destination)
         
         # Calculate distances from accommodation if provided
         if accommodation_location:
@@ -145,14 +156,71 @@ class DiningAgent:
             
             restaurants_text = restaurants_text.strip()
             restaurants = json.loads(restaurants_text)
-            
+            for restaurant in restaurants:
+                restaurant["source"] = "llm"
+
             logger.info(f"Got {len(restaurants)} restaurant recommendations")
             return restaurants
-            
+
         except Exception as e:
             logger.error(f"Error getting restaurants: {e}")
             return []
-    
+
+    def _get_real_restaurants(self, destination: str, num_restaurants: int) -> Optional[List[Dict]]:
+        """
+        Real, live restaurant listings (dining fusion) via
+        services/restaurants_api.py (Local Business Data / Google Maps), in
+        the same dict shape _get_restaurant_recommendations() produces so
+        downstream geocoding/distance/matching logic works unchanged either
+        way — these already come with coordinates, so they skip geocoding.
+
+        Returns None (not []) when real data isn't usable for any reason —
+        provider unconfigured, no listings found, or a provider error — so
+        the caller falls back to the LLM-generated flow instead of a trip
+        silently ending up with zero restaurants.
+        """
+        if not restaurants_api.is_configured():
+            return None
+
+        try:
+            listings = restaurants_api.search_restaurants(destination, limit=num_restaurants)
+            if not listings:
+                logger.warning(f"Real restaurants: no listings for '{destination}', falling back to LLM")
+                return None
+
+            restaurants = []
+            for listing in listings:
+                coordinates = None
+                if listing.get("latitude") is not None and listing.get("longitude") is not None:
+                    coordinates = {"lat": listing["latitude"], "lng": listing["longitude"]}
+
+                cuisine = ", ".join(listing.get("types") or []) or "Local"
+                rating = f"{listing['rating']}/5" if listing.get("rating") is not None else "N/A"
+
+                restaurants.append({
+                    "name": listing.get("name") or "Unnamed restaurant",
+                    "cuisine": cuisine,
+                    "price_range": listing.get("price_level") or "N/A",
+                    "meal_type": "any",
+                    "specialties": [],
+                    "atmosphere": cuisine,
+                    "location": listing.get("address") or destination,
+                    "neighborhood": destination,
+                    "must_try": "See menu",
+                    "avg_cost": listing.get("price_level") or "N/A",
+                    "reservation": "recommended",
+                    "description": listing.get("description")
+                    or f"Real-time listing, rated {rating} ({listing.get('review_count') or 0} reviews).",
+                    "coordinates": coordinates,
+                    "source": "real",
+                })
+
+            logger.info(f"Got {len(restaurants)} real restaurant listings for {destination}")
+            return restaurants
+        except RestaurantsAPIError as e:
+            logger.warning(f"Real restaurants lookup failed, falling back to LLM: {e}")
+            return None
+
     def _geocode_restaurants(self, restaurants: List[Dict], destination: str) -> List[Dict]:
         """Add coordinates to restaurants"""
         logger.info("Geocoding restaurants")

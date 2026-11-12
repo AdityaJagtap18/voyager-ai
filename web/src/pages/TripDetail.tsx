@@ -124,7 +124,18 @@ export default function TripDetail() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {trip.plan.restaurants.map((r, i) => (
                 <div key={i} className="rounded-xl2 border border-ink-900/5 bg-white p-4">
-                  <p className="font-semibold">{r.name}</p>
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="font-semibold">{r.name}</p>
+                    {r.source === "real" ? (
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        Live listing
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full bg-ink-100 px-2 py-0.5 text-xs font-medium text-ink-700">
+                        AI suggestion
+                      </span>
+                    )}
+                  </div>
                   <pre className="mt-1 whitespace-pre-wrap text-xs text-ink-500">
                     {JSON.stringify(r, null, 2)}
                   </pre>

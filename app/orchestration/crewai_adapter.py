@@ -30,6 +30,7 @@ from agents.dining_agent import DiningAgent
 from agents.itinerary_agent import ItineraryAgent
 from agents.research_agent import ResearchAgent
 from rag import get_context_for_destination
+from services.geocoding import geocode_attractions
 from utils.logger import logger
 
 
@@ -106,6 +107,11 @@ class CrewAIOrchestrator:
                     days=ctx.days,
                     knowledge_context=ctx.knowledge_context,
                 )
+                # Geocode now (not just at the final itinerary step) so the
+                # Accommodation and Dining steps that follow can actually
+                # score proximity to attractions instead of silently
+                # skipping it.
+                ctx.attractions = geocode_attractions(ctx.attractions, ctx.destination)
                 ctx.trace.append(_trace_entry("research", start, "success"))
             except Exception as exc:
                 ctx.errors.append(str(exc))

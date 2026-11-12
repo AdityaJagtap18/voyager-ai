@@ -25,10 +25,20 @@ class ItineraryAgent:
         logger.info("Itinerary Agent initialized with ORS and dining integration")
     
     def _geocode_attractions(self, attractions: List[Dict], destination: str) -> List[Dict]:
-        """Add coordinates to attractions using ORS geocoding"""
+        """Add coordinates to attractions using ORS geocoding.
+
+        Skips any attraction that already carries a 'coordinates' key — the
+        Research step (app/workflow.py, app/orchestration/crewai_adapter.py)
+        geocodes attractions earlier now via services/geocoding.py, so by
+        the time this runs there's usually nothing left to do. Kept here
+        for callers that skip that earlier step (e.g. tests)."""
+        to_geocode = [a for a in attractions if "coordinates" not in a]
+        if not to_geocode:
+            return attractions
+
         logger.info("Geocoding attractions for distance calculations")
-        
-        for attraction in attractions:
+
+        for attraction in to_geocode:
             query = f"{attraction['name']}, {destination}"
             try:
                 coords = geocode(query, limit=1)

@@ -46,7 +46,9 @@ def _build_workflow_with_mocked_agents():
 def test_plan_trip_trace_covers_all_four_steps_in_order():
     workflow, _ = _build_workflow_with_mocked_agents()
 
-    with patch("workflow.get_context_for_destination", return_value=""):
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ):
         result = workflow.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 
     assert result["success"] is True
@@ -58,7 +60,9 @@ def test_plan_trip_trace_covers_all_four_steps_in_order():
 def test_plan_trip_passes_start_date_through_to_accommodation_agent():
     workflow, mocks = _build_workflow_with_mocked_agents()
 
-    with patch("workflow.get_context_for_destination", return_value=""):
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ):
         workflow.plan_trip(
             destination="Goa, India", days=5, trip_type="relaxation", start_date="2026-12-10"
         )
@@ -70,7 +74,9 @@ def test_plan_trip_passes_start_date_through_to_accommodation_agent():
 def test_plan_trip_defaults_start_date_to_none():
     workflow, mocks = _build_workflow_with_mocked_agents()
 
-    with patch("workflow.get_context_for_destination", return_value=""):
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ):
         workflow.plan_trip(destination="Goa, India", days=5, trip_type="relaxation")
 
     _, kwargs = mocks["accommodation"].find_accommodations.call_args
@@ -81,7 +87,9 @@ def test_plan_trip_trace_records_error_status_for_failing_step():
     workflow, mocks = _build_workflow_with_mocked_agents()
     mocks["dining"].find_restaurants.side_effect = RuntimeError("provider down")
 
-    with patch("workflow.get_context_for_destination", return_value=""):
+    with patch("workflow.get_context_for_destination", return_value=""), patch(
+        "workflow.geocode_attractions", side_effect=lambda attractions, destination: attractions
+    ):
         result = workflow.plan_trip(destination="Mumbai, India", days=2, trip_type="historic")
 
     dining_entry = next(t for t in result["trace"] if t["step"] == "dining")
