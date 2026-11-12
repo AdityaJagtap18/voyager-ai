@@ -48,11 +48,21 @@ export class ApiError extends Error {
 // data, not a full offline-write queue (there's nothing to sync back once
 // reconnected, since nothing was written while offline).
 const CACHE_PREFIX = "voyager_cache:";
+// Bump this whenever a cached response shape changes (new fields added to a
+// GET response, e.g. a derived field like flight_recommendations). Entries
+// written under an older version are treated as a cache miss instead of
+// being served as if fresh — otherwise a trip visited once before a backend
+// change, then re-visited during a brief network hiccup, would silently show
+// permanently stale data (missing fields) with no way to tell.
+const CACHE_VERSION = "2";
 
 function cacheGet<T>(path: string): T | null {
   try {
     const raw = localStorage.getItem(CACHE_PREFIX + path);
-    return raw ? (JSON.parse(raw) as T) : null;
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { v: string; data: T };
+    if (parsed.v !== CACHE_VERSION) return null;
+    return parsed.data;
   } catch {
     return null;
   }
@@ -60,7 +70,7 @@ function cacheGet<T>(path: string): T | null {
 
 function cacheSet(path: string, data: unknown) {
   try {
-    localStorage.setItem(CACHE_PREFIX + path, JSON.stringify(data));
+    localStorage.setItem(CACHE_PREFIX + path, JSON.stringify({ v: CACHE_VERSION, data }));
   } catch {
     // localStorage unavailable/full — caching is a convenience, never fatal.
   }

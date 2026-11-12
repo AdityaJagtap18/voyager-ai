@@ -106,6 +106,7 @@ from agents.itinerary_agent import ItineraryAgent  # noqa: E402
 from services.budget_allocator import allocate_budget  # noqa: E402
 from services.flight_recommendations import recommend_flights  # noqa: E402
 from services.transport_recommendations import recommend_transport  # noqa: E402
+from services.accommodation_recommendations import recommend_accommodations  # noqa: E402
 from agents.trip_assistant_agent import TripAssistantAgent  # noqa: E402
 
 @asynccontextmanager
@@ -305,6 +306,14 @@ def _attach_derived_recommendations(trip: Trip, db: Session) -> None:
         itinerary_days = (trip.plan.get("itinerary") or {}).get("itinerary")
         trip.transport_recommendations = recommend_transport(transportation, itinerary_days)
 
+    trip.accommodation_recommendations = None
+    accommodations = (trip.plan or {}).get("accommodations") if trip.plan else None
+    if accommodations:
+        trip.accommodation_recommendations = recommend_accommodations(
+            accommodations,
+            nights=trip.days or 1,
+        )
+
 
 @app.get("/api/trips/{trip_id}", response_model=TripDetail)
 def get_trip(trip_id: str, db: Session = Depends(get_db)):
@@ -464,6 +473,7 @@ def _build_trip_assistant_context(trip: Trip) -> Dict[str, Any]:
         "budget_allocation": trip.budget_allocation,
         "flight_recommendations": trip.flight_recommendations,
         "transport_recommendations": trip.transport_recommendations,
+        "accommodation_recommendations": trip.accommodation_recommendations,
         "itinerary_summary": itinerary.get("summary"),
         "itinerary_days": [
             {

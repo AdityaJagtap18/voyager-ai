@@ -616,3 +616,48 @@ trip and got a correct, grounded answer back through the full stack (API → rea
 fresh from the current trip snapshot, with no memory of earlier questions in the same session) - this
 was a deliberate scope cut to ship a working, honest single-turn slice rather than a half-built
 multi-turn chat; persisting conversation turns would need a new DB table and is a natural next step.
+
+## Bug fix: recommendations appearing to disappear after leaving/re-entering a trip page
+
+User report: "flights and accommodation recommendations aren't saved" and don't come back after
+navigating away from a trip and back. Two causes were found and fixed.
+
+**Root cause 1 - stale offline cache masking new fields.** `web/src/api/client.ts` has a pre-existing
+"offline support" cache (every successful GET's JSON is saved to `localStorage`, served back only if a
+later `fetch()` throws a genuine network error). It had no versioning: a trip cached *before* Phase 11
+added `flight_recommendations`/`budget_allocation`/`transport_recommendations` to the response would,
+if ever served from that fallback during a brief backend restart, permanently look like it had lost
+its recommendations - with no indication the data was stale, and no retry. Fixed by wrapping every
+cache entry as `{v: CACHE_VERSION, data}` and treating a version mismatch as a cache miss
+(`cacheGet`/`cacheSet` in `client.ts`); bump `CACHE_VERSION` whenever a cached response's shape changes
+again in the future. Confirmed live: old pre-fix cache entries for `/api/currency/rates` and
+`/api/evaluations/...` (written before this change) have no `v` field and are now correctly ignored,
+while new writes carry `v: "2"`.
+
+**Root cause 2 - accommodation recommendations never existed.** Flights had a scored
+recommendation engine (`services/flight_recommendations.py`, Phase 11b); accommodations never got the
+equivalent, so there was nothing to "come back" - the user's "accommodation recommendations" simply
+weren't a built feature yet, which reads identically to "disappeared" from the outside. Built
+`app/services/accommodation_recommendations.py`, mirroring the flight engine's design and discipline:
+scores only real, provider-priced listings (`source: "real"`, i.e. live Booking.com listings fetched
+when a check-in date and `RAPIDAPI_KEY` are configured) into `cheapest` / `highest_rated` /
+`most_central` / `best_value` / `best_overall`, using only fields the provider returned (price_raw,
+the `"X/10"` rating string, `avg_distance_to_attractions` already computed by `AccommodationAgent`).
+LLM-suggested accommodations (`source: "llm"`) have no real price and are never scored - consistent
+with every other Phase 11 recommendation engine. 10 new tests (9 unit tests on the scoring module, 3
+API-level tests for the no-plan/LLM-only/mixed-real cases). Wired into `_attach_derived_recommendations`
+as `trip.accommodation_recommendations` (same always-fresh-on-read pattern as the other two engines,
+`TripDetail.accommodation_recommendations` in both `app/schemas.py` and `web/src/types.ts`) and
+surfaced on the Accommodations tab with the same recommendation-badge UI the Flights tab already had.
+
+Live-verified end to end: created a trip with two real-priced accommodations and one LLM one, confirmed
+the Accommodations tab showed `Cheapest`/`Best Value` on one and `Highest Rated`/`Most Central`/`Best
+Overall` on the other with correct reasons, navigated away to the trips list and back, and confirmed
+the same recommendations were still there (no stale/missing data) before deleting the test trip.
+
+**Explicitly out of scope**: the two specific trip IDs the user's stale cache pointed at
+(`a45c9045f7cd417b93f3df18466165de`, `3fab4502511c49cebf9a84a081504909`) turned out to already be
+deleted from the live database (confirmed 404 on both) by the time this was investigated, so the exact
+original failure couldn't be replayed against live data - the cache-versioning fix addresses the whole
+class of bug regardless. Real-time/transport, airport-transfer, and local-transport recommendations
+were not touched by this fix (they already worked correctly on repeated navigation).

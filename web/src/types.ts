@@ -184,6 +184,32 @@ export interface TransportRecommendations {
   assumptions: string[];
 }
 
+export const ACCOMMODATION_RECOMMENDATION_TAGS = ["best_overall", "cheapest", "highest_rated", "best_value", "most_central"] as const;
+export type AccommodationRecommendationTag = (typeof ACCOMMODATION_RECOMMENDATION_TAGS)[number];
+
+export interface ScoredAccommodationOffer {
+  index: number;
+  price_per_night: number;
+  total_price: number;
+  within_budget: boolean;
+  rating: number | null;
+  distance_km: number | null;
+  value_score: number | null;
+  composite_score: number;
+}
+
+export interface AccommodationRecommendations {
+  offers: ScoredAccommodationOffer[];
+  recommended: Partial<Record<AccommodationRecommendationTag, number>>;
+  labels: Record<AccommodationRecommendationTag, string>;
+  reasons: Partial<Record<AccommodationRecommendationTag, string>>;
+  weights: Record<string, number>;
+  nights: number;
+  max_nightly_budget: number | null;
+  any_in_budget: boolean;
+  assumptions: string[];
+}
+
 export interface TripPlan {
   attractions: Attraction[];
   itinerary: ItineraryResult;
@@ -214,6 +240,7 @@ export interface TripDetail extends TripSummary {
   budget_allocation: BudgetAllocation | null;
   flight_recommendations: FlightRecommendations | null;
   transport_recommendations: TransportRecommendations | null;
+  accommodation_recommendations: AccommodationRecommendations | null;
 }
 
 export interface TripCreateRequest {

@@ -76,6 +76,7 @@ class TripDetail(TripSummary):
     budget_allocation: Optional[Dict[str, Any]] = None
     flight_recommendations: Optional[Dict[str, Any]] = None
     transport_recommendations: Optional[Dict[str, Any]] = None
+    accommodation_recommendations: Optional[Dict[str, Any]] = None
 
 
 class SelectIndexRequest(BaseModel):

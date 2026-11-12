@@ -7,7 +7,7 @@ import TripBookings from "../components/TripBookings";
 import TripBudget from "../components/TripBudget";
 import TripDocuments from "../components/TripDocuments";
 import TripShare from "../components/TripShare";
-import type { TripDetail as TripDetailType, RecommendationTag, TransportMode } from "../types";
+import type { TripDetail as TripDetailType, RecommendationTag, TransportMode, AccommodationRecommendationTag } from "../types";
 
 const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
   walk: "Walk",
@@ -587,6 +587,25 @@ export default function TripDetail() {
                   )}
                 </div>
               )}
+              {trip.accommodation_recommendations && (
+                <div className="rounded-xl2 border border-brand-100 bg-brand-50/60 p-3 text-xs text-ink-700">
+                  <p className="font-semibold text-brand-700">
+                    Recommendations use {trip.accommodation_recommendations.nights} night
+                    {trip.accommodation_recommendations.nights === 1 ? "" : "s"}
+                  </p>
+                  {!trip.accommodation_recommendations.any_in_budget &&
+                    trip.accommodation_recommendations.max_nightly_budget != null && (
+                      <p className="mt-1 text-amber-700">
+                        No listing fits under the nightly budget cap — showing the closest options for comparison anyway.
+                      </p>
+                    )}
+                  {trip.accommodation_recommendations.assumptions.map((a, i) => (
+                    <p key={i} className="mt-1 text-ink-500">
+                      {a}
+                    </p>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {trip.plan.accommodations.map((a, i) => {
                   const isSelected = trip.selected_accommodation_index === i;
@@ -594,11 +613,32 @@ export default function TripDetail() {
                     a.source === "real" && a.currency
                       ? convertedPrice(a.price_raw ?? null, a.currency)
                       : null;
+                  const accRecs = trip.accommodation_recommendations;
+                  const accTags = accRecs
+                    ? (Object.entries(accRecs.recommended) as [AccommodationRecommendationTag, number | undefined][])
+                        .filter(([, idx]) => idx === i)
+                        .map(([tag]) => tag)
+                    : [];
                   return (
                     <div
                       key={i}
                       className={`rounded-xl2 border bg-white p-4 ${isSelected ? "border-brand-500 ring-1 ring-brand-500" : "border-ink-900/5"}`}
                     >
+                      {accTags.length > 0 && (
+                        <div className="mb-2 flex flex-wrap gap-1.5">
+                          {accTags.map((tag) => (
+                            <span
+                              key={tag}
+                              title={accRecs?.reasons[tag]}
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                tag === "best_overall" ? "bg-amber-100 text-amber-800" : "bg-sky-100 text-sky-700"
+                              }`}
+                            >
+                              {accRecs?.labels[tag]}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <p className="font-semibold">{String(a.name)}</p>
                         <div className="flex shrink-0 items-center gap-2">
@@ -626,6 +666,9 @@ export default function TripDetail() {
                           )}
                         </div>
                       </div>
+                      {accTags.length > 0 && accRecs && (
+                        <p className="mb-2 text-xs text-ink-500">{accRecs.reasons[accTags[0]]}</p>
+                      )}
                       {converted && (
                         <p className="text-sm font-medium text-ink-700">
                           {converted.currency} {converted.amount} / night

@@ -1078,6 +1078,39 @@ def test_get_trip_computes_local_transport_recommendations_from_itinerary_hops()
     assert rec["local_transport"][0]["recommended_mode"] == "cycle"
 
 
+def test_get_trip_has_no_accommodation_recommendations_without_any_plan():
+    trip_id = _create_test_trip()
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["accommodation_recommendations"] is None
+
+
+def test_get_trip_has_no_accommodation_recommendations_when_only_llm_suggestions_exist():
+    plan = {"accommodations": [{"name": "AI Villa", "source": "llm"}]}
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    assert resp.json()["accommodation_recommendations"] is None
+
+
+def test_get_trip_computes_accommodation_recommendations_from_real_listings():
+    plan = {
+        "accommodations": [
+            {"name": "Budget Inn", "price_raw": 50.0, "currency": "USD", "rating": "6.0/10",
+             "avg_distance_to_attractions": 3.0, "source": "real"},
+            {"name": "Luxe Resort", "price_raw": 200.0, "currency": "USD", "rating": "9.5/10",
+             "avg_distance_to_attractions": 0.5, "source": "real"},
+            {"name": "AI-suggested villa", "source": "llm"},
+        ],
+    }
+    trip_id = _create_test_trip(plan=plan)
+    resp = client.get(f"/api/trips/{trip_id}")
+    rec = resp.json()["accommodation_recommendations"]
+    assert rec is not None
+    assert len(rec["offers"]) == 2
+    assert rec["recommended"]["cheapest"] == 0
+    assert rec["recommended"]["highest_rated"] == 1
+    assert rec["recommended"]["most_central"] == 1
+
+
 # --- Phase 11d: currency conversion -----------------------------------------
 
 
