@@ -39,6 +39,8 @@ export default function MyTrips() {
   const [extrasByTrip, setExtrasByTrip] = useState<Record<string, TripExtras>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<TripSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     api
@@ -81,6 +83,20 @@ export default function MyTrips() {
     return out;
   });
   const failedTrips = trips.filter((t) => t.status === "failed");
+
+  async function handleConfirmDelete() {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await api.deleteTrip(confirmDelete.id);
+      setTrips((prev) => prev.filter((t) => t.id !== confirmDelete.id));
+      setConfirmDelete(null);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <div>
@@ -135,9 +151,41 @@ export default function MyTrips() {
           const extras = extrasByTrip[trip.id];
           const checks = extras ? computeReadiness(extras) : null;
           const readiness = checks ? { done: checks.filter((c) => c.done).length, total: checks.length } : undefined;
-          return <TripCard key={trip.id} trip={trip} readiness={readiness} />;
+          return (
+            <TripCard key={trip.id} trip={trip} readiness={readiness} onDelete={setConfirmDelete} />
+          );
         })}
       </div>
+
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded-xl2 bg-white p-5 shadow-card-hover">
+            <p className="font-semibold text-ink-900">Delete this trip?</p>
+            <p className="mt-1 text-sm text-ink-500">
+              This permanently deletes <span className="font-medium text-ink-700">{confirmDelete.destination}</span>{" "}
+              and all of its bookings, expenses, and documents. This can't be undone.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(null)}
+                disabled={deleting}
+                className="rounded-lg px-3 py-1.5 text-sm font-medium text-ink-600 hover:bg-ink-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                className="rounded-lg bg-rose-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {deleting ? "Deleting…" : "Delete trip"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

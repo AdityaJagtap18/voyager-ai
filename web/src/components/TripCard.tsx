@@ -36,21 +36,44 @@ export function formatDateRange(startDate: string | null, days: number) {
 export default function TripCard({
   trip,
   readiness,
+  onDelete,
 }: {
   trip: TripSummary;
   /** Optional - how many of the real readiness checks (My Trips command center) this trip has met. */
   readiness?: { done: number; total: number };
+  /** Optional - shows a delete button on the card (top-left) when provided. */
+  onDelete?: (trip: TripSummary) => void;
 }) {
   return (
     <Link
       to={`/trips/${trip.id}`}
-      className="group overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+      className="group relative overflow-hidden rounded-xl2 border border-ink-900/5 bg-white shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
     >
       <div className={`relative h-28 overflow-hidden bg-gradient-to-br ${coverFor(trip.destination)}`}>
         <div
           aria-hidden="true"
           className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent transition-opacity duration-200 group-hover:opacity-80"
         />
+        {onDelete && (
+          <button
+            type="button"
+            aria-label={`Delete ${trip.destination} trip`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onDelete(trip);
+            }}
+            className="absolute left-3 top-3 rounded-full bg-black/30 p-1.5 text-white opacity-0 transition-opacity hover:bg-rose-600 group-hover:opacity-100"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+              <path
+                fillRule="evenodd"
+                d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 3.993V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+        )}
         <span
           className={`absolute right-3 top-3 rounded-full px-2 py-0.5 text-xs font-medium shadow-sm ${
             statusBadge[trip.status] ?? "bg-white/90 text-ink-700"

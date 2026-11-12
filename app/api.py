@@ -345,6 +345,24 @@ def get_trip(trip_id: str, db: Session = Depends(get_db)):
     return trip
 
 
+@app.delete("/api/trips/{trip_id}", status_code=204)
+def delete_trip(trip_id: str, db: Session = Depends(get_db)):
+    """Permanently deletes a trip and everything attached to it - bookings,
+    expenses, and documents (including their files on disk; no ORM-level
+    cascade is configured on these FKs, so each is cleaned up explicitly)."""
+    trip = db.get(Trip, trip_id)
+    if trip is None:
+        raise HTTPException(status_code=404, detail="Trip not found")
+
+    for document in db.query(TripDocument).filter(TripDocument.trip_id == trip_id).all():
+        delete_document_file(document.stored_path)
+        db.delete(document)
+    db.query(BookingModel).filter(BookingModel.trip_id == trip_id).delete()
+    db.query(ExpenseModel).filter(ExpenseModel.trip_id == trip_id).delete()
+    db.delete(trip)
+    db.commit()
+
+
 @app.post("/api/trips", response_model=TripDetail, status_code=201)
 def create_trip(payload: TripCreateRequest, db: Session = Depends(get_db)):
     if payload.trip_type.lower() not in TRIP_TYPES:

@@ -169,6 +169,26 @@ def test_get_unknown_trip_returns_404():
     assert resp.status_code == 404
 
 
+def test_delete_unknown_trip_returns_404():
+    resp = client.delete("/api/trips/does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_delete_trip_removes_it_and_its_bookings_and_expenses():
+    trip_id = _create_test_trip()
+    client.post(f"/api/trips/{trip_id}/bookings", json={"type": "flight", "title": "Flight to Goa", "cost": 100})
+    client.post(f"/api/trips/{trip_id}/expenses", json={"category": "food", "amount": 20})
+
+    resp = client.delete(f"/api/trips/{trip_id}")
+    assert resp.status_code == 204
+    assert client.get(f"/api/trips/{trip_id}").status_code == 404
+
+    db = TestingSessionLocal()
+    assert db.query(api_module.BookingModel).filter(api_module.BookingModel.trip_id == trip_id).count() == 0
+    assert db.query(api_module.ExpenseModel).filter(api_module.ExpenseModel.trip_id == trip_id).count() == 0
+    db.close()
+
+
 def _create_test_trip(plan=None) -> str:
     """Insert a trip directly (bypassing the workflow) for bookings/expenses/selection tests."""
     db = TestingSessionLocal()
