@@ -1,6 +1,6 @@
 """Pydantic request/response schemas for the FastAPI trip-planning API."""
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -292,6 +292,25 @@ class WeatherLocation(BaseModel):
 class WeatherForecastResponse(BaseModel):
     location: WeatherLocation
     days: List[WeatherDay]
+
+
+class CurrencyConversion(BaseModel):
+    amount: float
+    from_: str = Field(alias="from")
+    to: str
+    rate: float
+    converted: float
+    date: Optional[str] = None
+    source: Literal["real"] = "real"
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class CurrencyRates(BaseModel):
+    base: str
+    date: Optional[str] = None
+    rates: Dict[str, float]
+    source: Literal["real"] = "real"
 
 
 class PlaceResult(BaseModel):

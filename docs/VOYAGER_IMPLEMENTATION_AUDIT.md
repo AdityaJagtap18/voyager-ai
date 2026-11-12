@@ -556,3 +556,22 @@ against naturally - the throwaway trip was deleted after verification).
 
 Full suite: 278 passed (256 prior + 18 new unit tests in `tests/test_transport_recommendations.py` +
 5 new API tests in `tests/test_api.py`).
+
+## Currency converter (Phase 11e)
+
+A standalone, real-data currency converter, built on request alongside the recommendation engine
+work rather than as part of the original spec. `app/services/currency_api.py` wraps Frankfurter
+(ECB reference rates, free and keyless) with an in-process per-pair cache (1 hour TTL); every
+function returns `None` on a provider/network failure rather than estimating or hardcoding a rate
+- the same discipline as every other provider integration in this codebase. Two endpoints:
+`GET /api/currency/convert` (one real conversion) and `GET /api/currency/rates` (the full live rate
+table for one base currency, used to populate the converter UI's dropdowns). A new standalone page
+at `/currency` (linked from Home's quick links) lets a user convert any amount between two
+currencies, with a swap button and the live rate/date shown alongside the result. 15 new tests (11
+unit + 4 API-level); live-verified in the browser at desktop and mobile widths against the real
+Frankfurter API (100 USD → 9,369 INR at the live rate of 93.69, correctly dated).
+
+Not built: automatic conversion of flight/hotel offer prices shown elsewhere in the app (those stay
+in their original, real provider currency, as before) - this is a standalone conversion tool, not yet
+wired into the Flights/Budget tabs. Multi-currency budget tracking (e.g. a budget set in one currency
+automatically reconciled against expenses logged in another) is also not built.

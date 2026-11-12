@@ -1076,3 +1076,44 @@ def test_get_trip_computes_local_transport_recommendations_from_itinerary_hops()
     assert rec["airport_transfer"] is None
     assert len(rec["local_transport"]) == 1
     assert rec["local_transport"][0]["recommended_mode"] == "cycle"
+
+
+# --- Phase 11d: currency conversion -----------------------------------------
+
+
+def test_currency_convert_uses_real_rate(monkeypatch):
+    monkeypatch.setattr(
+        api_module.currency_api, "convert",
+        lambda amount, base, target: {
+            "amount": amount, "from": base.upper(), "to": target.upper(),
+            "rate": 90.0, "converted": amount * 90.0, "date": "2026-11-12", "source": "real",
+        },
+    )
+    resp = client.get("/api/currency/convert", params={"amount": 100, "from_currency": "USD", "to_currency": "INR"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["converted"] == 9000.0
+    assert body["from"] == "USD"
+    assert body["source"] == "real"
+
+
+def test_currency_convert_returns_502_when_rate_unavailable(monkeypatch):
+    monkeypatch.setattr(api_module.currency_api, "convert", lambda amount, base, target: None)
+    resp = client.get("/api/currency/convert", params={"amount": 100, "from_currency": "USD", "to_currency": "ZZZ"})
+    assert resp.status_code == 502
+
+
+def test_currency_rates_uses_real_rates(monkeypatch):
+    monkeypatch.setattr(
+        api_module.currency_api, "list_rates",
+        lambda base: {"base": base.upper(), "date": "2026-11-12", "rates": {"INR": 93.69}, "source": "real"},
+    )
+    resp = client.get("/api/currency/rates", params={"base": "USD"})
+    assert resp.status_code == 200
+    assert resp.json()["rates"] == {"INR": 93.69}
+
+
+def test_currency_rates_returns_502_when_unavailable(monkeypatch):
+    monkeypatch.setattr(api_module.currency_api, "list_rates", lambda base: None)
+    resp = client.get("/api/currency/rates", params={"base": "USD"})
+    assert resp.status_code == 502

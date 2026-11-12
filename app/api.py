@@ -53,7 +53,7 @@ from rag import EmbeddingUnavailableError, ingest_document, list_documents, sear
 from evaluation import EVAL_CASES, run_eval_suite  # noqa: E402
 from guardrails import is_blocked, scan_text  # noqa: E402
 from documents import DocumentTooLargeError, delete_document_file, save_document_bytes  # noqa: E402
-from services import flights_api, hotels_api, ors_api, weather_api  # noqa: E402
+from services import currency_api, flights_api, hotels_api, ors_api, weather_api  # noqa: E402
 from services.flights_api import FlightsAPIError  # noqa: E402
 from services.hotels_api import HotelsAPIError  # noqa: E402
 from services.ors_api import ORSError  # noqa: E402
@@ -72,6 +72,8 @@ from app.schemas import (  # noqa: E402
     EvaluationRunDetail,
     EvaluationRunRequest,
     EvaluationRunSummary,
+    CurrencyConversion,
+    CurrencyRates,
     Expense,
     ExpenseCreateRequest,
     FlightOffer,
@@ -799,6 +801,28 @@ def weather_forecast(destination: str):
         return weather_api.get_forecast(destination)
     except WeatherAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+@app.get("/api/currency/convert", response_model=CurrencyConversion)
+def currency_convert(amount: float, from_currency: str, to_currency: str):
+    """Real, live exchange rate via Frankfurter (ECB reference rates, no API
+    key needed) - see app/services/currency_api.py. 502 (not a fabricated
+    rate) when the provider can't resolve the pair."""
+    result = currency_api.convert(amount, from_currency, to_currency)
+    if result is None:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not resolve exchange rate for {from_currency.upper()} -> {to_currency.upper()}",
+        )
+    return result
+
+
+@app.get("/api/currency/rates", response_model=CurrencyRates)
+def currency_rates(base: str = "USD"):
+    result = currency_api.list_rates(base)
+    if result is None:
+        raise HTTPException(status_code=502, detail=f"Could not fetch live rates for base currency {base.upper()}")
+    return result
 
 
 @app.get("/api/maps/search", response_model=List[PlaceResult])

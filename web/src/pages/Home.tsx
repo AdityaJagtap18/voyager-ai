@@ -12,6 +12,7 @@ const quickLinks = [
   { label: "Weather", sub: "Forecast & alerts", icon: "Travel/weather.svg", to: "/weather", tint: "bg-cyan-100" },
   { label: "Budget", sub: "Plan & track", icon: "Navigation/budget.svg", to: "/budget", tint: "bg-pink-100" },
   { label: "Maps", sub: "Routes & explore", icon: "Travel/map.svg", to: "/maps", tint: "bg-emerald-100" },
+  { label: "Currency", sub: "Live exchange rates", icon: "Travel/currency.svg", to: "/currency", tint: "bg-lime-100" },
 ];
 
 export default function Home() {

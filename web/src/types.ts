@@ -401,6 +401,23 @@ export interface WeatherForecast {
   days: WeatherDay[];
 }
 
+export interface CurrencyConversion {
+  amount: number;
+  from: string;
+  to: string;
+  rate: number;
+  converted: number;
+  date: string | null;
+  source: "real";
+}
+
+export interface CurrencyRates {
+  base: string;
+  date: string | null;
+  rates: Record<string, number>;
+  source: "real";
+}
+
 export interface MapPlace {
   label: string | null;
   lat: number;

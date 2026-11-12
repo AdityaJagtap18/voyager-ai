@@ -2,6 +2,8 @@ import type {
   AgentInfo,
   Booking,
   BookingCreateRequest,
+  CurrencyConversion,
+  CurrencyRates,
   EvaluationRunDetail,
   EvaluationRunRequest,
   EvaluationRunSummary,
@@ -197,6 +199,17 @@ export const api = {
 
   weatherForecast: (destination: string) =>
     request<WeatherForecast>(`/api/weather/forecast?${new URLSearchParams({ destination })}`),
+
+  convertCurrency: (amount: number, fromCurrency: string, toCurrency: string) =>
+    request<CurrencyConversion>(
+      `/api/currency/convert?${new URLSearchParams({
+        amount: String(amount),
+        from_currency: fromCurrency,
+        to_currency: toCurrency,
+      })}`
+    ),
+  currencyRates: (base: string) =>
+    request<CurrencyRates>(`/api/currency/rates?${new URLSearchParams({ base })}`),
 
   mapsSearch: (query: string) =>
     request<MapPlace[]>(`/api/maps/search?${new URLSearchParams({ query })}`),
