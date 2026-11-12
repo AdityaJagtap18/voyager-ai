@@ -18,6 +18,9 @@ import type {
   MapPlace,
   MapRoute,
   ModelInfo,
+  ObservabilityOverview,
+  ObservabilitySpan,
+  ObservabilityTraceSummary,
   PlaceSuggestion,
   PublicTripView,
   ShareLinkResponse,
@@ -235,6 +238,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message }),
     }),
+
+  observabilityOverview: () => request<ObservabilityOverview>("/api/observability/overview"),
+  observabilityTraces: (limit = 50) =>
+    request<ObservabilityTraceSummary[]>(`/api/observability/traces?${new URLSearchParams({ limit: String(limit) })}`),
+  observabilityTrace: (traceId: string) =>
+    request<ObservabilitySpan[]>(`/api/observability/traces/${traceId}`),
 
   mapsSearch: (query: string) =>
     request<MapPlace[]>(`/api/maps/search?${new URLSearchParams({ query })}`),

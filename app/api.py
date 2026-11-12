@@ -62,6 +62,7 @@ from services.hotels_api import HotelsAPIError  # noqa: E402
 from services.ors_api import ORSError  # noqa: E402
 from services.weather_api import WeatherAPIError  # noqa: E402
 from app.models_db import EvaluationRun, GuardrailEvent, TripDocument  # noqa: E402
+from app.models_db import Span  # noqa: E402
 from app.schemas import (  # noqa: E402
     BOOKING_STATUSES,
     BOOKING_TYPES,
@@ -1070,3 +1071,83 @@ def maps_route(
         return ors_api.get_route((origin_lat, origin_lng), (dest_lat, dest_lng), profile=profile)
     except ORSError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
+
+
+# --- Observability dashboard (Phase 12 / Phase 4 UI) ----------------------------
+# Reads the real `spans` table OTel writes (app/observability) instead of the
+# older flat Trip.trace list - this is what lets the Observability page show
+# a real trace explorer instead of per-trip step timings. Empty/no-data
+# responses are distinguished from "tracing is disabled" so the frontend
+# never has to guess why a number is missing.
+
+_ROOT_SPAN_NAME = "voyager.trip.generate"
+_LLM_SPAN_NAME = "llm.request"
+
+
+@app.get("/api/observability/overview")
+def observability_overview(db: Session = Depends(get_db)):
+    roots = db.query(Span).filter(Span.name == _ROOT_SPAN_NAME).all()
+    llm_spans = db.query(Span).filter(Span.name == _LLM_SPAN_NAME).all()
+
+    total_runs = len(roots)
+    ok_runs = sum(1 for s in roots if s.status == "ok")
+    token_totals = [
+        s.attributes["llm.usage.total_tokens"]
+        for s in llm_spans
+        if isinstance(s.attributes, dict) and isinstance(s.attributes.get("llm.usage.total_tokens"), (int, float))
+    ]
+
+    return {
+        "otel_enabled": Config.OTEL_ENABLED,
+        "total_runs": total_runs,
+        "success_rate": round(ok_runs / total_runs * 100, 1) if total_runs else None,
+        "avg_latency_ms": round(sum(s.duration_ms for s in roots) / total_runs, 0) if total_runs else None,
+        "total_llm_calls": len(llm_spans),
+        # None (not 0) when no span ever reported usage - never pretend a
+        # missing number is zero.
+        "total_tokens": sum(token_totals) if token_totals else None,
+    }
+
+
+@app.get("/api/observability/traces")
+def list_observability_traces(limit: int = 50, db: Session = Depends(get_db)):
+    roots = (
+        db.query(Span)
+        .filter(Span.name == _ROOT_SPAN_NAME)
+        .order_by(Span.start_time.desc())
+        .limit(min(limit, 200))
+        .all()
+    )
+    return [
+        {
+            "trace_id": s.trace_id,
+            "trip_id": s.trip_id,
+            "destination": (s.attributes or {}).get("voyager.destination"),
+            "framework": (s.attributes or {}).get("voyager.framework"),
+            "model": (s.attributes or {}).get("llm.model"),
+            "start_time": s.start_time,
+            "duration_ms": s.duration_ms,
+            "status": s.status,
+        }
+        for s in roots
+    ]
+
+
+@app.get("/api/observability/traces/{trace_id}")
+def get_observability_trace(trace_id: str, db: Session = Depends(get_db)):
+    spans = db.query(Span).filter(Span.trace_id == trace_id).order_by(Span.start_time.asc()).all()
+    if not spans:
+        raise HTTPException(status_code=404, detail="No spans found for this trace")
+    return [
+        {
+            "span_id": s.span_id,
+            "parent_span_id": s.parent_span_id,
+            "name": s.name,
+            "start_time": s.start_time,
+            "duration_ms": s.duration_ms,
+            "status": s.status,
+            "status_message": s.status_message,
+            "attributes": s.attributes,
+        }
+        for s in spans
+    ]

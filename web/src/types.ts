@@ -477,6 +477,37 @@ export interface CurrencyRates {
   source: "real";
 }
 
+export interface ObservabilityOverview {
+  otel_enabled: boolean;
+  total_runs: number;
+  success_rate: number | null;
+  avg_latency_ms: number | null;
+  total_llm_calls: number;
+  total_tokens: number | null;
+}
+
+export interface ObservabilityTraceSummary {
+  trace_id: string;
+  trip_id: string | null;
+  destination: string | null;
+  framework: string | null;
+  model: string | null;
+  start_time: string;
+  duration_ms: number;
+  status: string;
+}
+
+export interface ObservabilitySpan {
+  span_id: string;
+  parent_span_id: string | null;
+  name: string;
+  start_time: string;
+  duration_ms: number;
+  status: string;
+  status_message: string | null;
+  attributes: Record<string, unknown>;
+}
+
 export interface MapPlace {
   label: string | null;
   lat: number;
