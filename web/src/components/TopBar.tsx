@@ -1,7 +1,7 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function TopBar() {
+export default function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [notifOpen, setNotifOpen] = useState(false);
@@ -14,8 +14,18 @@ export default function TopBar() {
   }
 
   return (
-    <div className="flex items-center gap-4 border-b border-ink-900/5 bg-white px-8 py-3">
-      <form onSubmit={handleSearch} className="flex-1 max-w-xl">
+    <div className="flex items-center gap-2 border-b border-ink-900/5 bg-white px-4 py-3 sm:gap-4 sm:px-8">
+      <button
+        type="button"
+        onClick={onMenuClick}
+        aria-label="Toggle navigation"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-700 hover:bg-surface lg:hidden"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M3 6h18M3 12h18M3 18h18" />
+        </svg>
+      </button>
+      <form onSubmit={handleSearch} className="min-w-0 flex-1 sm:max-w-xl">
         <div className="flex items-center gap-2 rounded-lg border border-ink-900/10 bg-surface px-3 py-2">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5C6680" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />

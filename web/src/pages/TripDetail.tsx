@@ -77,7 +77,7 @@ export default function TripDetail() {
 
       {trip.status !== "planning" && (
         <>
-          <div className="mb-4 flex gap-2 border-b border-ink-900/10">
+          <div className="mb-4 flex gap-2 overflow-x-auto border-b border-ink-900/10">
             {(trip.plan
               ? (["itinerary", "restaurants", "accommodations", "bookings", "budget", "documents", "share"] as Tab[])
               : (["bookings", "budget", "documents", "share"] as Tab[])
@@ -85,7 +85,7 @@ export default function TripDetail() {
               <button
                 key={t}
                 onClick={() => setTab(t)}
-                className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize ${
+                className={`-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium capitalize ${
                   tab === t ? "border-brand-600 text-brand-700" : "border-transparent text-ink-500 hover:text-ink-900"
                 }`}
               >
