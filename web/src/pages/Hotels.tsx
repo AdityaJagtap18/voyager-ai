@@ -53,7 +53,7 @@ export default function Hotels() {
       />
 
       <form onSubmit={handleSearch} className="mb-8 flex flex-wrap items-end gap-3 rounded-xl2 border border-ink-900/5 bg-white p-6">
-        <label className="relative flex flex-1 min-w-[220px] flex-col gap-1 text-sm font-medium">
+        <label className="relative flex w-full min-w-[220px] flex-1 flex-col gap-1 text-sm font-medium sm:w-auto">
           Destination
           <input
             required
@@ -80,30 +80,30 @@ export default function Hotels() {
             </div>
           )}
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
+        <label className="flex w-full flex-col gap-1 text-sm font-medium sm:w-auto">
           Check-in
           <input
             required
             type="date"
             value={checkin}
             onChange={(e) => setCheckin(e.target.value)}
-            className="rounded-lg border border-ink-900/10 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-ink-900/10 px-3 py-2 text-sm"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm font-medium">
+        <label className="flex w-full flex-col gap-1 text-sm font-medium sm:w-auto">
           Check-out
           <input
             required
             type="date"
             value={checkout}
             onChange={(e) => setCheckout(e.target.value)}
-            className="rounded-lg border border-ink-900/10 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-ink-900/10 px-3 py-2 text-sm"
           />
         </label>
         <button
           type="submit"
           disabled={loading}
-          className="rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50"
+          className="w-full rounded-lg bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 disabled:opacity-50 sm:w-auto"
         >
           {loading ? "Searching…" : "Search hotels"}
         </button>
