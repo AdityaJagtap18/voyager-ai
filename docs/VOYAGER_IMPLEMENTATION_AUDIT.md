@@ -768,3 +768,38 @@ Conditional badges.
 **Explicitly out of scope**: an actual workflow *builder* (dragging/editing nodes, saving custom
 pipelines) - nothing in the blueprint or this request asked for one, and the real pipeline isn't
 user-configurable today, so a builder UI would have nothing real to edit.
+
+## Second real flight provider, as a fallback behind RapidAPI (Phase 11l)
+
+The RapidAPI "flights-sky" provider (`app/services/flights_api.py`) hit its monthly free-tier quota,
+leaving flights unavailable until the quota resets. Investigated two alternatives before picking one:
+
+- **Amadeus for Developers' Self-Service Flight Offers Search API** - looked viable (free sandbox,
+  no credit card) and was fully implemented and tested, but turned out to be dead: Amadeus
+  decommissioned the self-service developer portal on July 17th, replacing it with an "Enterprise API
+  Portal" gated behind a sales/approval flow. Confirmed live by the user's own screenshot of
+  developers.amadeus.com. The implementation (`app/services/amadeus_api.py`,
+  `tests/test_amadeus_api.py`) was removed rather than left in as dead, uncredentialable code.
+- **Kiwi.com's Tequila API** - also checked and ruled out: closed to public self-service registration
+  since 2024, now B2B/partner-only.
+
+**Chosen instead: Sky Scrapper on RapidAPI** (`apiheya/sky-scrapper`, host
+`sky-scrapper.p.rapidapi.com`), in `app/services/sky_scrapper_api.py`. Same shape and anti-fabrication
+contract as `flights_api.search_flights_for_trip()` (returns `None`, never fabricates, on any
+unconfigured/unresolvable/empty/error outcome). The key difference from the Amadeus/Kiwi paths: it's a
+*different API product on the same RapidAPI account*, so it reuses the existing `RAPIDAPI_KEY` env var
+directly - no new signup, no new credentials, just subscribing to its separate free Basic plan
+(~100 requests/month, independent quota from flights-sky's).
+
+`flights_api.search_flights_for_trip()` now tries RapidAPI's flights-sky first, falls back to
+`sky_scrapper_api` only if that has nothing (lazily checking `is_configured()` so a successful
+flights-sky lookup never touches the fallback at all), and only logs a "no offers from any configured
+provider" warning once both have been tried. 24 tests across `tests/test_flights_api.py` and the new
+`tests/test_sky_scrapper_api.py`, plus the full 334-test suite, all pass.
+
+**Not yet live-verified against the real Sky Scrapper API**: the field names in
+`_search_flights()`/`search_airport()` are based on the listing's documented endpoints and response
+shape (third-party-documented, not an official spec), so the exact JSON shape should be re-checked
+against a real response once a key is subscribed - if RapidAPI's actual payload differs, parsing will
+simply find nothing and return `None` (consistent with the anti-fabrication contract) rather than throw
+or fabricate, but the fallback won't surface real offers until that's confirmed.

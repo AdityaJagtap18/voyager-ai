@@ -168,3 +168,45 @@ def test_search_flights_for_trip_returns_none_on_provider_error(monkeypatch):
 
     monkeypatch.setattr(flights_api, "autocomplete_place", raise_error)
     assert flights_api.search_flights_for_trip("Mumbai", "Goa", "2026-12-10") is None
+
+
+# --- Sky Scrapper fallback (Phase 11l) --------------------------------------
+
+
+def test_search_flights_for_trip_does_not_call_sky_scrapper_when_rapidapi_succeeds(monkeypatch):
+    monkeypatch.setattr(flights_api, "_search_via_rapidapi", lambda *a, **k: [{"source": "real", "price_raw": 100}])
+
+    def boom(*a, **k):
+        raise AssertionError("should not call Sky Scrapper when flights-sky already found offers")
+
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "is_configured", boom)
+    assert flights_api.search_flights_for_trip("Mumbai", "Goa", "2026-12-10") == [{"source": "real", "price_raw": 100}]
+
+
+def test_search_flights_for_trip_falls_back_to_sky_scrapper_when_rapidapi_has_nothing(monkeypatch):
+    monkeypatch.setattr(flights_api, "_search_via_rapidapi", lambda *a, **k: None)
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "is_configured", lambda: True)
+    monkeypatch.setattr(
+        flights_api.sky_scrapper_api, "search_flights_for_trip",
+        lambda *a, **k: [{"source": "real", "price_raw": 92.0, "airline": "IndiGo"}],
+    )
+    offers = flights_api.search_flights_for_trip("Mumbai", "Goa", "2026-12-10")
+    assert offers == [{"source": "real", "price_raw": 92.0, "airline": "IndiGo"}]
+
+
+def test_search_flights_for_trip_returns_none_when_both_providers_have_nothing(monkeypatch):
+    monkeypatch.setattr(flights_api, "_search_via_rapidapi", lambda *a, **k: None)
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "is_configured", lambda: True)
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "search_flights_for_trip", lambda *a, **k: None)
+    assert flights_api.search_flights_for_trip("Mumbai", "Goa", "2026-12-10") is None
+
+
+def test_search_flights_for_trip_skips_sky_scrapper_when_not_configured(monkeypatch):
+    monkeypatch.setattr(flights_api, "_search_via_rapidapi", lambda *a, **k: None)
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "is_configured", lambda: False)
+
+    def boom(*a, **k):
+        raise AssertionError("should not call Sky Scrapper's search when it isn't configured")
+
+    monkeypatch.setattr(flights_api.sky_scrapper_api, "search_flights_for_trip", boom)
+    assert flights_api.search_flights_for_trip("Mumbai", "Goa", "2026-12-10") is None

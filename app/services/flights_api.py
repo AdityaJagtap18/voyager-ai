@@ -9,11 +9,22 @@ clean, reliable results in testing. The RapidAPI listing's own "Booking.com
 Flights" section (same host, different paths) turned out to proxy booking.com
 directly and hit its anti-bot captcha on a live test call — avoided here in
 favor of this host's plain `/flights/*` paths, which didn't.
+
+search_flights_for_trip() below falls back to services/sky_scrapper_api.py
+(Phase 11l) when this provider has nothing - unconfigured, rate-limited, or
+genuinely no offers - so a single RapidAPI free-tier quota running out
+doesn't take real flight data down for the whole app. (An earlier version
+of this fallback targeted Amadeus' self-service Flight Offers Search API,
+but that program was decommissioned - replaced with a sales-gated
+"Enterprise API Portal" - before it could be used; Sky Scrapper is a
+different API product on the same RapidAPI account/key, with its own free
+quota, so it needs no new signup at all.)
 """
 import os
 from typing import Optional
 import requests
 
+from services import sky_scrapper_api
 from utils.logger import logger
 
 RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
@@ -109,38 +120,32 @@ def search_one_way(origin: str, destination: str, depart_date: str, currency: st
     return offers
 
 
-def search_flights_for_trip(origin_query: str, destination_query: str, depart_date: str, limit: int = 5) -> Optional[list]:
-    """Real flight search grounded in free-text origin/destination (Phase 10 fusion).
-
-    Resolves both place names via autocomplete_place() to the skyId codes
+def _search_via_rapidapi(origin_query: str, destination_query: str, depart_date: str, limit: int = 5) -> Optional[list]:
+    """Resolves both place names via autocomplete_place() to the skyId codes
     search_one_way() needs, then searches. Returns None (never a fabricated
     list) when the provider is unconfigured, either place can't be resolved,
-    no offers come back, or the provider errors - callers must treat None as
-    "no real flight data available" rather than inventing prices/times to
-    fill the gap (per the platform's anti-fabrication requirements).
-    """
+    no offers come back, or the provider errors."""
     if not is_configured():
         return None
     try:
         origin_matches = autocomplete_place(origin_query)
         if not origin_matches:
-            logger.warning(f"Real flights: no autocomplete match for origin '{origin_query}', skipping")
+            logger.warning(f"Real flights (RapidAPI): no autocomplete match for origin '{origin_query}', skipping")
             return None
         dest_matches = autocomplete_place(destination_query)
         if not dest_matches:
-            logger.warning(f"Real flights: no autocomplete match for destination '{destination_query}', skipping")
+            logger.warning(f"Real flights (RapidAPI): no autocomplete match for destination '{destination_query}', skipping")
             return None
 
         origin_sky_id = origin_matches[0]["sky_id"]
         dest_sky_id = dest_matches[0]["sky_id"]
         if not origin_sky_id or not dest_sky_id:
-            logger.warning(f"Real flights: autocomplete match for '{origin_query}' -> '{destination_query}' had no skyId, skipping")
+            logger.warning(f"Real flights (RapidAPI): autocomplete match for '{origin_query}' -> '{destination_query}' had no skyId, skipping")
             return None
 
         offers = search_one_way(origin_sky_id, dest_sky_id, depart_date)
         if not offers:
-            logger.warning(f"Real flights: no offers for {origin_sky_id} -> {dest_sky_id} on {depart_date}; "
-                            "no flight data shown (flights have no LLM fallback, by design)")
+            logger.warning(f"Real flights (RapidAPI): no offers for {origin_sky_id} -> {dest_sky_id} on {depart_date}")
             return None
 
         for offer in offers:
@@ -149,5 +154,32 @@ def search_flights_for_trip(origin_query: str, destination_query: str, depart_da
             offer["destination_query"] = dest_matches[0]["title"]
         return offers[:limit]
     except FlightsAPIError as exc:
-        logger.warning(f"Real flights lookup failed, no flight data shown (flights have no LLM fallback): {exc}")
+        logger.warning(f"Real flights (RapidAPI) lookup failed: {exc}")
         return None
+
+
+def search_flights_for_trip(origin_query: str, destination_query: str, depart_date: str, limit: int = 5) -> Optional[list]:
+    """Real flight search grounded in free-text origin/destination (Phase 10
+    fusion). Tries the RapidAPI "flights-sky" provider first, then falls
+    back to services/sky_scrapper_api.py (Phase 11l) if that has nothing.
+    Returns None (never a fabricated list) only once both providers have
+    nothing - callers must treat None as "no real flight data available"
+    rather than inventing prices/times to fill the gap (per the platform's
+    anti-fabrication requirements).
+    """
+    offers = _search_via_rapidapi(origin_query, destination_query, depart_date, limit)
+    if offers:
+        return offers
+
+    sky_scrapper_configured = sky_scrapper_api.is_configured()
+    if sky_scrapper_configured:
+        offers = sky_scrapper_api.search_flights_for_trip(origin_query, destination_query, depart_date, limit)
+        if offers:
+            return offers
+
+    if is_configured() or sky_scrapper_configured:
+        logger.warning(
+            f"Real flights: no offers for '{origin_query}' -> '{destination_query}' on {depart_date} from any "
+            "configured provider; no flight data shown (flights have no LLM fallback, by design)"
+        )
+    return None
