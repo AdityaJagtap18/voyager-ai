@@ -235,7 +235,6 @@ export default function TripDetail() {
               ? ([
                   "itinerary",
                   "flights",
-                  "transportation",
                   "restaurants",
                   "accommodations",
                   "bookings",

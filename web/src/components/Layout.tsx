@@ -15,7 +15,8 @@ const travelNav: NavItem[] = [
   { label: "My Trips", to: "/trips", icon: "Navigation/my-trips.svg" },
   { label: "Bookings & Wallet", to: "/bookings", icon: "Navigation/bookings.svg" },
   { label: "Budget & Expenses", to: "/budget", icon: "Navigation/budget.svg" },
-  { label: "Group Trips", to: "/group-trips", icon: "Navigation/group-trips.svg" },
+  // Hidden from the sidebar for now (route/page kept intact, just not linked here).
+  // { label: "Group Trips", to: "/group-trips", icon: "Navigation/group-trips.svg" },
   { label: "Travel Companion", to: "/companion", icon: "Navigation/compass.svg" },
 ];
 
