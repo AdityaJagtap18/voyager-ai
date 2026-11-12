@@ -286,6 +286,42 @@ export default function TripDetail() {
           {tab === "itinerary" && trip.plan && (() => {
             const days = trip.plan.itinerary?.itinerary ?? [];
             const activeDay = days.find((d) => d.day === selectedDay) ?? days[0];
+
+            // Every line here is derived from data already loaded for this
+            // trip - no new fetches, no invented percentages. Anything we
+            // can't actually check from real data is left out rather than
+            // guessed (per the "never fabricate metrics" rule).
+            const insights: string[] = [];
+            const totalWarnings = days.reduce((sum, d) => sum + (d.warnings?.length ?? 0), 0);
+            insights.push(
+              totalWarnings === 0
+                ? "No scheduling conflicts across the trip"
+                : `${totalWarnings} scheduling conflict${totalWarnings === 1 ? "" : "s"} flagged - see day warnings`
+            );
+            if (trip.accommodation_recommendations) {
+              insights.push(
+                trip.accommodation_recommendations.any_in_budget
+                  ? "At least one accommodation fits your budget cap"
+                  : "No accommodation fits under your nightly budget cap - showing closest options"
+              );
+            }
+            if (trip.flight_recommendations) {
+              insights.push(
+                trip.flight_recommendations.any_in_budget
+                  ? "At least one flight fits your budget cap"
+                  : "No flight fits under your budget cap - showing closest options"
+              );
+            }
+            const dayStops = activeDay?.activities.length ?? 0;
+            const dayGeocoded = activeDay?.activities.filter((a) => a.coordinates).length ?? 0;
+            if (dayStops > 0) {
+              insights.push(
+                dayGeocoded === dayStops
+                  ? `All ${dayStops} of today's stops are mapped with real coordinates`
+                  : `${dayGeocoded} of ${dayStops} of today's stops are mapped with real coordinates`
+              );
+            }
+
             return (
               <div className="flex flex-col gap-4">
                 {days.length > 1 && (
@@ -351,9 +387,24 @@ export default function TripDetail() {
                         )}
                       </div>
                     </div>
-                    <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4 lg:col-span-2">
-                      <p className="mb-2 text-xs font-semibold text-ink-600">Day {activeDay.day} route</p>
-                      <DayMap activities={activeDay.activities} />
+                    <div className="flex flex-col gap-4 lg:col-span-2">
+                      {insights.length > 0 && (
+                        <div className="rounded-xl2 border border-brand-100 bg-brand-50/60 p-4">
+                          <p className="mb-2 text-xs font-semibold text-brand-700">Trip insights</p>
+                          <ul className="flex flex-col gap-1.5">
+                            {insights.map((insight, i) => (
+                              <li key={i} className="flex gap-1.5 text-xs text-ink-700">
+                                <span className="text-brand-600">✓</span>
+                                {insight}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      <div className="rounded-xl2 border border-ink-900/5 bg-white shadow-card p-4">
+                        <p className="mb-2 text-xs font-semibold text-ink-600">Day {activeDay.day} route</p>
+                        <DayMap activities={activeDay.activities} />
+                      </div>
                     </div>
                   </div>
                 )}
