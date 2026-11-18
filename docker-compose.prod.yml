@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  backend:
+    image: ghcr.io/adityajagtap18/voyager-ai-backend:latest
+    container_name: voyager-ai-backend
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - voyager-network
+
+  frontend:
+    image: ghcr.io/adityajagtap18/voyager-ai-frontend:latest
+    container_name: voyager-ai-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:80"
+    networks:
+      - voyager-network
+
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    container_name: voyager-phoenix
+    restart: unless-stopped
+    environment:
+      - PHOENIX_WORKING_DIR=/mnt/data
+    ports:
+      - "127.0.0.1:6006:6006"   # loopback only — not exposed publicly
+    volumes:
+      - phoenix-data:/mnt/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - voyager-network
+
+volumes:
+  phoenix-data:
+
+networks:
+  voyager-network:
+    driver: bridge

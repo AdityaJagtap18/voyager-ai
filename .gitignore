@@ -84,6 +84,13 @@ web/.env.local
 # Docker
 .dockerignore
 
+# Deployment keys — NEVER commit these
+deploy_key
+deploy_key.pub
+
+# Production secrets
+.env.prod
+
 # Temporary
 tmp/
 temp/
